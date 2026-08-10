@@ -75,7 +75,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onBackToWelcome }) => {
     fetchGame();
   // Poll for game status if waiting
   React.useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (polling && gameSet) {
       interval = setInterval(async () => {
         const { data, error } = await supabase
