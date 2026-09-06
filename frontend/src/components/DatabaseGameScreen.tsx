@@ -107,7 +107,11 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
     }
   }, [buzzWinnerIndex]);
 
-  const resetBuzz = useCallback(() => setBuzzWinnerIndex(null), []);
+  const resetBuzz = useCallback(() => {
+    resetBuzzer();
+    setBuzzWinnerIndex(null);
+    lastButtonSnapshot.current = [false, false, false, false, false];
+  }, [resetBuzzer]);
   const [showStrikeAnimation, setShowStrikeAnimation] = useState(false);
   // Fix timeout type for browser builds
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -679,6 +683,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
         currentQuestionIndex={safeQuestionIndex}
         onRevealAnswer={revealAnswer}
         arduinoConnected={connected}
+        onResetBuzzer={resetBuzz}
         buttonStates={buttonStates}
         lastPressedIndex={lastPressedIndex}
         buzzWinnerIndex={buzzWinnerIndex}

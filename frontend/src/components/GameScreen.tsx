@@ -117,8 +117,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
       playPlayerPressSound();
     }
   }, [buzzWinnerIndex, playPlayerPressSound]);
+// Testing
+ // const resetBuzz = () => setBuzzWinnerIndex(null);
+ const resetBuzz = useCallback(() => {
+  if (!connected) return; 
 
-  const resetBuzz = () => setBuzzWinnerIndex(null);
+  resetBuzzer();
+  setBuzzWinnerIndex(null);
+
+  // Clear the previous button snapshot
+  lastButtonSnapshot.current = [false, false, false, false, false];
+}, [connected, resetBuzzer]);
 
   // Auto-reset buzzer when strikes reach 3 (but allow steal attempts to complete)
   useEffect(() => {
@@ -150,7 +159,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
         resetBuzz();
       }
     }
-  }, [gameState.strikes, buzzWinnerIndex, teamStrikes]);
+  }, [gameState.strikes, buzzWinnerIndex, teamStrikes, resetBuzz]);
 
   // Auto-reset buzzer when question changes
   const prevQuestionIndexRef = useRef<number>(gameState.currentQuestionIndex);
@@ -302,14 +311,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
         >
           {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
         </button>
-        {connected && (
-          <button
+        <button
             onClick={resetBuzz}
-            className="px-3 py-1 rounded-md text-xs font-semibold shadow bg-yellow-600 hover:bg-yellow-700 text-white"
+            disabled={!connected}
+            title={connected ? 'Reset buzzer' : 'Connect Arduino first'}
+            className={`px-3 py-2 rounded-md text-sm font-semibold shadow transition-colors ${
+              connected
+                ? 'bg-yellow-600 hover:bg-yellow-700 text-white cursor-pointer'
+                : 'bg-gray-500 text-gray-300 opacity-50 cursor-not-allowed'
+            }`}
           >
-            Reset Buzz
+            🔄 Reset Buzz
           </button>
-        )}
         {arduinoError && (
           <div className="text-xs text-red-300 max-w-[160px]">{arduinoError}</div>
         )}
@@ -328,22 +341,23 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
             points: (a as any).points,
             revealed: (a as any).revealed ?? false
         }))}
-        team1Score={gameState.team1Score}
-        team2Score={gameState.team2Score}
-        team3Score={gameState.team3Score}
-        team4Score={gameState.team4Score}
-        team5Score={gameState.team5Score}
-        team1Strikes={teamStrikes.team1}
-        team2Strikes={teamStrikes.team2}
-        team3Strikes={teamStrikes.team3}
-        team4Strikes={teamStrikes.team4}
-        team5Strikes={teamStrikes.team5}
-        currentQuestionIndex={gameState.currentQuestionIndex + 1}
-        onRevealAnswer={revealAnswer}
-        arduinoConnected={connected}
-        buttonStates={buttonStates}
-        lastPressedIndex={lastPressedIndex}
-        buzzWinnerIndex={buzzWinnerIndex}
+         team1Score={gameState.team1Score}
+      team2Score={gameState.team2Score}
+      team3Score={gameState.team3Score}
+      team4Score={gameState.team4Score}
+      team5Score={gameState.team5Score}
+      team1Strikes={teamStrikes.team1}
+      team2Strikes={teamStrikes.team2}
+      team3Strikes={teamStrikes.team3}
+      team4Strikes={teamStrikes.team4}
+      team5Strikes={teamStrikes.team5}
+      currentQuestionIndex={gameState.currentQuestionIndex + 1}
+      onRevealAnswer={revealAnswer}
+      arduinoConnected={connected}
+      onResetBuzzer={resetBuzz}
+      buttonStates={buttonStates}
+      lastPressedIndex={lastPressedIndex}
+      buzzWinnerIndex={buzzWinnerIndex}
       />
     </div>
   );

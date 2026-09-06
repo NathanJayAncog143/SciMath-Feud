@@ -29,6 +29,7 @@ interface GameBoardProps {
   buttonStates?: boolean[]; // index 0..4 for teams 1..5
   lastPressedIndex?: number | null;
   buzzWinnerIndex?: number | null;
+  onResetBuzzer?: () => void;
   showStrikeAnimation?: boolean;
   // Sound control
   gameId?: string;
@@ -58,6 +59,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   buttonStates = [false, false, false, false, false],
   lastPressedIndex = null,
   buzzWinnerIndex = null,
+  onResetBuzzer,
   showStrikeAnimation = false,
   gameId
 }) => {
@@ -344,38 +346,49 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const teamHighlight = (teamIndex: number, base: string) => {
-    // Check if team is disabled first
-    const disabled = isTeamDisabled(teamIndex);
-    if (disabled) {
-      return base + ' opacity-30 grayscale cursor-not-allowed border-gray-500';
-    }
-    
-    if (!arduinoConnected) return base;
-    
-    // Check if this team is celebrating (locked in)
-    const isCelebrating = celebratingTeam === teamIndex;
-    
-    // If a winner is locked, show only that team highlighted
-    if (buzzWinnerIndex !== null && buzzWinnerIndex !== undefined) {
-      if (buzzWinnerIndex === teamIndex) {
-        const celebrationStyles = isCelebrating 
-          ? ' ring-8 ring-yellow-300 animate-pulse shadow-[0_0_25px_rgba(255,255,0,0.9)] scale-105 border-yellow-200' 
-          : ' ring-4 ring-white animate-pulse shadow-[0_0_18px_rgba(255,255,255,0.8)]';
-        return base + celebrationStyles;
-      }
-      return base + ' opacity-70';
-    }
-    // Otherwise, live-echo pressed buttons and briefly flash last press
-    const active = !!buttonStates[teamIndex];
-    const winnerFlash = lastPressedIndex === teamIndex;
-    if (winnerFlash) {
-      return base + ' ring-4 ring-white animate-pulse';
-    }
-    if (active) {
-      return base + ' ring-4 ring-yellow-300 shadow-[0_0_15px_rgba(255,255,0,0.7)]';
-    }
-    return base;
-  };
+  // Check if team is disabled first
+  const disabled = isTeamDisabled(teamIndex);
+
+  if (disabled) {
+    return base + ' opacity-30 grayscale cursor-not-allowed border-gray-500';
+  }
+
+  if (!arduinoConnected) return base;
+
+  // Check if this team is the current buzzer winner
+  const isWinner = buzzWinnerIndex === teamIndex;
+
+  if (isWinner) {
+    return base + `
+      !from-gray-950 !via-gray-900 !to-black
+      border-yellow-200
+      ring-8 ring-yellow-300
+      shadow-[0_0_35px_rgba(255,220,0,0.95)]
+      scale-105
+      animate-pulse
+      z-30
+    `;
+  }
+
+  // If another team already won, slightly dim this team
+  if (buzzWinnerIndex !== null && buzzWinnerIndex !== undefined) {
+    return base + ' opacity-60';
+  }
+
+  // Live button feedback before a winner is locked
+  const active = !!buttonStates[teamIndex];
+  const winnerFlash = lastPressedIndex === teamIndex;
+
+  if (winnerFlash) {
+    return base + ' ring-4 ring-white animate-pulse';
+  }
+
+  if (active) {
+    return base + ' ring-4 ring-yellow-300 shadow-[0_0_15px_rgba(255,255,0,0.7)]';
+  }
+
+  return base;
+};
 
   // Helper function to get team box classes with animation
   const getTeamBoxClasses = (teamNumber: number, baseClasses: string) => {
@@ -395,6 +408,21 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <div className="w-screen h-screen fixed inset-0 overflow-hidden bg-gradient-to-b from-blue-800 via-blue-900 to-blue-950 flex items-center justify-center">
+      {/* Reset Buzzer Button */}
+      <button
+        onClick={onResetBuzzer}
+        disabled={!arduinoConnected || !onResetBuzzer}
+        className={`absolute top-3 left-1/2 -translate-x-1/2 z-50
+          px-6 py-3 rounded-xl font-bold text-lg shadow-xl
+          transition-all duration-200
+          ${
+            arduinoConnected && onResetBuzzer
+              ? 'bg-yellow-500 hover:bg-yellow-400 text-black cursor-pointer'
+              : 'bg-gray-500 text-gray-300 opacity-60 cursor-not-allowed'
+          }`}
+      >
+        🔄 RESET BUZZERS
+      </button>
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute inset-0 bg-gradient-radial from-blue-600/20 to-transparent"></div>
@@ -426,7 +454,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(0, "bg-gradient-to-br from-red-700 to-red-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(1, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
-                <div className="text-white font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1">
+                <div
+                  className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
+                    buzzWinnerIndex === 0
+                      ? 'text-yellow-200'
+                      : 'text-white'
+                  }`}
+                >
+                  {buzzWinnerIndex === 0 && (
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
+                      ⚡ BUZZED FIRST!
+                    </div>
+                  )}
+
                   {team1Name || 'Team 1'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
@@ -444,7 +484,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(2, "bg-gradient-to-br from-green-700 to-green-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(3, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
-                <div className="text-white font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1">
+                <div
+                  className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
+                    buzzWinnerIndex === 2
+                      ? 'text-yellow-200'
+                      : 'text-white'
+                  }`}
+                >
+                  {buzzWinnerIndex === 2 && (
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
+                      ⚡ BUZZED FIRST!
+                    </div>
+                  )}
+
                   {team3Name || 'Team 3'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
@@ -531,7 +583,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(1, "bg-gradient-to-br from-blue-700 to-blue-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(2, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
-                <div className="text-white font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1">
+                <div
+                  className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
+                    buzzWinnerIndex === 1
+                      ? 'text-yellow-200'
+                      : 'text-white'
+                  }`}
+                >
+                  {buzzWinnerIndex === 1 && (
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
+                      ⚡ BUZZED FIRST!
+                    </div>
+                  )}
+
                   {team2Name || 'Team 2'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
@@ -549,7 +613,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(3, "bg-gradient-to-br from-red-900 to-red-950 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(4, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
-                <div className="text-white font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1">
+                <div
+                  className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
+                    buzzWinnerIndex === 3
+                      ? 'text-yellow-200'
+                      : 'text-white'
+                  }`}
+                >
+                  {buzzWinnerIndex === 3 && (
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
+                      ⚡ BUZZED FIRST!
+                    </div>
+                  )}
+
                   {team4Name || 'Team 4'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
@@ -570,7 +646,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
             <div className={teamHighlight(4, "bg-gradient-to-br from-yellow-600 to-yellow-700 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-24 sm:w-32 lg:w-40 xl:w-44 h-20 sm:h-24 lg:h-28 xl:h-32 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
               <div className={getTeamBoxClasses(5, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
               <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
-              <div className="text-white font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1">
+              <div
+                className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
+                  buzzWinnerIndex === 4
+                    ? 'text-yellow-200'
+                    : 'text-white'
+                }`}
+              >
+                {buzzWinnerIndex === 4 && (
+                  <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
+                    ⚡ BUZZED FIRST!
+                  </div>
+                )}
+
                 {team5Name || 'Team 5'}
               </div>
               <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
@@ -610,10 +698,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
               🎉
             </div>
             <div className="text-white text-6xl font-black drop-shadow-2xl animate-pulse">
-              {getTeamName(celebratingTeam).toUpperCase()} LOCKED IN!
+              {getTeamName(celebratingTeam).toUpperCase()} BUZZED FIRST!
             </div>
             <div className="text-yellow-400 text-4xl font-bold drop-shadow-lg animate-bounce mt-4" style={{ animationDelay: '0.3s' }}>
-              🔥 GET READY! 🔥
+              ⚡ FIRST TO BUZZ! ⚡
             </div>
           </div>
           
