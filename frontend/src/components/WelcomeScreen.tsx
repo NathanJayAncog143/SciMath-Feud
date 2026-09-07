@@ -13,22 +13,37 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartGame, onSettings, 
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    // Start playing background music when component mounts
-    if (audioRef.current) {
-      audioRef.current.volume = 0.3; // Set volume to 30%
-      audioRef.current.loop = true; // Loop the music
-      audioRef.current.play().catch(error => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const playTheme = () => {
+      audio.volume = 0.3;
+      audio.loop = true;
+      audio.play().catch(error => {
         console.log('Audio autoplay prevented:', error);
-        // Handle autoplay restrictions by modern browsers
       });
-    }
+    };
+
+    playTheme();
+
+    const playThemeFromInteraction = () => {
+      playTheme();
+      window.removeEventListener('pointerdown', playThemeFromInteraction);
+      window.removeEventListener('keydown', playThemeFromInteraction);
+      window.removeEventListener('touchstart', playThemeFromInteraction);
+    };
+
+    window.addEventListener('pointerdown', playThemeFromInteraction, { once: true });
+    window.addEventListener('keydown', playThemeFromInteraction, { once: true });
+    window.addEventListener('touchstart', playThemeFromInteraction, { once: true });
 
     // Cleanup function to stop music when component unmounts
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      window.removeEventListener('pointerdown', playThemeFromInteraction);
+      window.removeEventListener('keydown', playThemeFromInteraction);
+      window.removeEventListener('touchstart', playThemeFromInteraction);
+      audio.pause();
+      audio.currentTime = 0;
     };
   }, []);
 

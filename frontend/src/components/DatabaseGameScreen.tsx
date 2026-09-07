@@ -688,6 +688,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
         lastPressedIndex={lastPressedIndex}
         buzzWinnerIndex={buzzWinnerIndex}
         showStrikeAnimation={showStrikeAnimation}
+        gameId={game?.id}
       />
     </div>
   );

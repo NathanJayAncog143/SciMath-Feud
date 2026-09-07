@@ -186,6 +186,22 @@ export async function updateGame(id, updates) {
   return getGameById(id);
 }
 
+export async function triggerGameSound(gameId, sound) {
+  const columns = {
+    intense: 'play_intense_sound_at',
+    winning: 'play_winning_sound_at',
+    stop: 'stop_sounds_at'
+  };
+  const column = columns[sound];
+
+  if (!column) {
+    throw new Error(`Unsupported sound trigger: ${sound}`);
+  }
+
+  await pool.query(`UPDATE sf_games SET \`${column}\` = NOW(3) WHERE id = ?`, [gameId]);
+  return getGameById(gameId);
+}
+
 export async function addTeamStrike(gameId, teamId) {
   const [resultSets] = await pool.query('CALL sp_add_team_strike(?, ?)', [gameId, teamId]);
   return rowsFromCall(resultSets)[0] || null;

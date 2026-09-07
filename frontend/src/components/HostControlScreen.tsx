@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import HostControl from './Answer';
-import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, supabase } from '../lib/supabase';
+import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, triggerGameSound, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
 
 interface HostControlScreenProps {
@@ -531,15 +531,11 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     if (!game) return;
     
     try {
-      const { error } = await supabase
-        .from('games')
-        .update({ play_intense_sound_at: new Date().toISOString() })
-        .eq('id', game.id);
-      
-      if (error) {
-        console.error('Error triggering intense sound:', error);
-      } else {
+      const success = await triggerGameSound(game.id, 'intense');
+      if (success) {
         console.log('Intense sound triggered successfully');
+      } else {
+        console.error('Error triggering intense sound');
       }
     } catch (error) {
       console.error('Error triggering intense sound:', error);
@@ -550,15 +546,11 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     if (!game) return;
     
     try {
-      const { error } = await supabase
-        .from('games')
-        .update({ play_winning_sound_at: new Date().toISOString() })
-        .eq('id', game.id);
-      
-      if (error) {
-        console.error('Error triggering winning sound:', error);
-      } else {
+      const success = await triggerGameSound(game.id, 'winning');
+      if (success) {
         console.log('Winning sound triggered successfully');
+      } else {
+        console.error('Error triggering winning sound');
       }
     } catch (error) {
       console.error('Error triggering winning sound:', error);
@@ -569,15 +561,11 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     if (!game) return;
     
     try {
-      const { error } = await supabase
-        .from('games')
-        .update({ stop_sounds_at: new Date().toISOString() })
-        .eq('id', game.id);
-      
-      if (error) {
-        console.error('Error triggering stop sounds:', error);
-      } else {
+      const success = await triggerGameSound(game.id, 'stop');
+      if (success) {
         console.log('Stop sounds triggered successfully');
+      } else {
+        console.error('Error triggering stop sounds');
       }
     } catch (error) {
       console.error('Error triggering stop sounds:', error);

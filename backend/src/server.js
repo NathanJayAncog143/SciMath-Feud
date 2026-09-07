@@ -13,6 +13,7 @@ import {
   getTeams,
   revealAnswer,
   saveGameSet,
+  triggerGameSound,
   updateGame
 } from './db.js';
 
@@ -178,6 +179,15 @@ const server = createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const game = await addTeamStrike(decodeURIComponent(strikeMatch[1]), Number(body.teamId));
       broadcast({ type: 'game-updated', game });
+      sendJson(res, 200, { game, success: true });
+      return;
+    }
+
+    const soundMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/sounds$/);
+    if (req.method === 'POST' && soundMatch) {
+      const body = await readJsonBody(req);
+      const game = await triggerGameSound(decodeURIComponent(soundMatch[1]), body.sound);
+      broadcast({ type: 'game-updated', game, sound: body.sound });
       sendJson(res, 200, { game, success: true });
       return;
     }

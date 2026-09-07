@@ -433,6 +433,19 @@ export const addTeamStrike = async (gameId: string, teamId: number): Promise<boo
   }
 };
 
+export const triggerGameSound = async (gameId: string, sound: 'intense' | 'winning' | 'stop'): Promise<boolean> => {
+  try {
+    await request(`/api/games/${encodeURIComponent(gameId)}/sounds`, {
+      method: 'POST',
+      body: JSON.stringify({ sound })
+    });
+    return true;
+  } catch (error) {
+    console.error('Error triggering game sound:', error);
+    return false;
+  }
+};
+
 export const revealAnswerInGame = async (gameId: string, answerId: string, revealedByTeam: number): Promise<boolean> => {
   try {
     await request('/api/game-answers', {

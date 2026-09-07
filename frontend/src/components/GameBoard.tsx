@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import themeSong from '../assets/Family Feud Theme Song (Harvey era).mp3';
+import intenseSound from '../assets/intense.mp3';
+import winningRoundSound from '../assets/winning_round.mp3';
 
 interface GameBoardProps {
   answers: Array<{
@@ -232,20 +235,33 @@ const GameBoard: React.FC<GameBoardProps> = ({
   }, [team1Score, team2Score, team3Score, team4Score, team5Score]);
 
   // Sound effect refs
+  const themeAudioRef = useRef<HTMLAudioElement | null>(null);
   const intenseAudioRef = useRef<HTMLAudioElement | null>(null);
   const winningRoundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const activeEffectAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   // Initialize audio elements
   useEffect(() => {
-    intenseAudioRef.current = new Audio('/src/assets/intense.mp3');
-    winningRoundAudioRef.current = new Audio('/src/assets/winning_round.mp3');
+    themeAudioRef.current = new Audio(themeSong);
+    intenseAudioRef.current = new Audio(intenseSound);
+    winningRoundAudioRef.current = new Audio(winningRoundSound);
 
     // Set volume levels
+    if (themeAudioRef.current) {
+      themeAudioRef.current.volume = 0.25;
+      themeAudioRef.current.loop = true;
+    }
     if (intenseAudioRef.current) intenseAudioRef.current.volume = 0.7;
     if (winningRoundAudioRef.current) winningRoundAudioRef.current.volume = 0.8;
+    if (intenseAudioRef.current) intenseAudioRef.current.loop = true;
 
     return () => {
       // Cleanup audio elements
+      if (themeAudioRef.current) {
+        themeAudioRef.current.pause();
+        themeAudioRef.current = null;
+      }
       if (intenseAudioRef.current) {
         intenseAudioRef.current.pause();
         intenseAudioRef.current = null;
@@ -254,6 +270,91 @@ const GameBoard: React.FC<GameBoardProps> = ({
         winningRoundAudioRef.current.pause();
         winningRoundAudioRef.current = null;
       }
+    };
+  }, []);
+
+  const playThemeSong = () => {
+    if (!themeAudioRef.current || activeEffectAudioRef.current) return;
+
+    themeAudioRef.current
+      .play()
+      .then(() => setAudioUnlocked(true))
+      .catch(error => {
+        console.log('Could not play Family Feud theme:', error);
+      });
+  };
+
+  const pauseThemeSong = () => {
+    if (!themeAudioRef.current) return;
+    themeAudioRef.current.pause();
+  };
+
+  const stopAudio = (audio: HTMLAudioElement | null) => {
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+  };
+
+  const playHostSound = (audio: HTMLAudioElement | null, label: string) => {
+    if (!audio) return;
+
+    pauseThemeSong();
+    stopAudio(activeEffectAudioRef.current);
+    activeEffectAudioRef.current = audio;
+    audio.onended = () => {
+      if (activeEffectAudioRef.current !== audio) return;
+      activeEffectAudioRef.current = null;
+      playThemeSong();
+    };
+
+    audio.currentTime = 0;
+    audio.play().catch(error => {
+      console.log(`Error playing ${label} sound:`, error);
+      if (activeEffectAudioRef.current === audio) {
+        activeEffectAudioRef.current = null;
+      }
+      playThemeSong();
+    });
+  };
+
+  const unlockAudio = async () => {
+    const audioElements = [themeAudioRef.current, intenseAudioRef.current, winningRoundAudioRef.current].filter(Boolean) as HTMLAudioElement[];
+
+    try {
+      await Promise.all(audioElements.map(async (audio) => {
+        audio.muted = true;
+        await audio.play();
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+      }));
+      setAudioUnlocked(true);
+      playThemeSong();
+    } catch (error) {
+      console.log('Audio unlock was blocked:', error);
+      audioElements.forEach((audio) => {
+        audio.muted = false;
+      });
+    }
+  };
+
+  useEffect(() => {
+    playThemeSong();
+  }, []);
+
+  useEffect(() => {
+    const unlockFromInteraction = () => {
+      unlockAudio();
+    };
+
+    window.addEventListener('pointerdown', unlockFromInteraction, { once: true });
+    window.addEventListener('keydown', unlockFromInteraction, { once: true });
+    window.addEventListener('touchstart', unlockFromInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockFromInteraction);
+      window.removeEventListener('keydown', unlockFromInteraction);
+      window.removeEventListener('touchstart', unlockFromInteraction);
     };
   }, []);
 
@@ -283,32 +384,22 @@ const GameBoard: React.FC<GameBoardProps> = ({
         // Check for intense sound trigger
         if (data.play_intense_sound_at && data.play_intense_sound_at !== lastSoundTimestamps.current.intense) {
           lastSoundTimestamps.current.intense = data.play_intense_sound_at;
-          if (intenseAudioRef.current) {
-            intenseAudioRef.current.currentTime = 0;
-            intenseAudioRef.current.play().catch(e => console.log('Error playing intense sound:', e));
-          }
+          playHostSound(intenseAudioRef.current, 'intense');
         }
 
         // Check for winning sound trigger
         if (data.play_winning_sound_at && data.play_winning_sound_at !== lastSoundTimestamps.current.winning) {
           lastSoundTimestamps.current.winning = data.play_winning_sound_at;
-          if (winningRoundAudioRef.current) {
-            winningRoundAudioRef.current.currentTime = 0;
-            winningRoundAudioRef.current.play().catch(e => console.log('Error playing winning sound:', e));
-          }
+          playHostSound(winningRoundAudioRef.current, 'winning');
         }
 
         // Check for stop sounds trigger
         if (data.stop_sounds_at && data.stop_sounds_at !== lastSoundTimestamps.current.stop) {
           lastSoundTimestamps.current.stop = data.stop_sounds_at;
-          if (intenseAudioRef.current) {
-            intenseAudioRef.current.pause();
-            intenseAudioRef.current.currentTime = 0;
-          }
-          if (winningRoundAudioRef.current) {
-            winningRoundAudioRef.current.pause();
-            winningRoundAudioRef.current.currentTime = 0;
-          }
+          stopAudio(intenseAudioRef.current);
+          stopAudio(winningRoundAudioRef.current);
+          activeEffectAudioRef.current = null;
+          playThemeSong();
         }
       } catch (error) {
         console.error('Error polling sound triggers:', error);
@@ -316,6 +407,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     };
 
     // Poll every 500ms for sound triggers
+    pollSoundTriggers();
     const interval = setInterval(pollSoundTriggers, 500);
 
     return () => clearInterval(interval);
@@ -674,6 +766,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Large Strike Animation Overlay */}
+      {!audioUnlocked && (
+        <button
+          onClick={unlockAudio}
+          className="fixed bottom-4 right-4 z-[60] bg-yellow-400 hover:bg-yellow-300 text-blue-950 font-black px-5 py-3 rounded-lg shadow-2xl border-2 border-white"
+          title="Enable audio on this screen"
+        >
+          ENABLE AUDIO
+        </button>
+      )}
 
       {/* Large Strike Animation Overlay */}
       {showStrikeAnimation && (
