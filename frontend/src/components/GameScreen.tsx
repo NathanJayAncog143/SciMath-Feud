@@ -311,18 +311,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
         >
           {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
         </button>
-        <button
-            onClick={resetBuzz}
-            disabled={!connected}
-            title={connected ? 'Reset buzzer' : 'Connect Arduino first'}
-            className={`px-3 py-2 rounded-md text-sm font-semibold shadow transition-colors ${
-              connected
-                ? 'bg-yellow-600 hover:bg-yellow-700 text-white cursor-pointer'
-                : 'bg-gray-500 text-gray-300 opacity-50 cursor-not-allowed'
-            }`}
-          >
-            🔄 Reset Buzz
-          </button>
         {arduinoError && (
           <div className="text-xs text-red-300 max-w-[160px]">{arduinoError}</div>
         )}
@@ -337,9 +325,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
 
       <GameBoard
         answers={questionData.answers.map(a => ({
-          text: (a as any).text,
-            points: (a as any).points,
-            revealed: (a as any).revealed ?? false
+          text: a.text,
+          points: a.points,
+          revealed: a.revealed ?? false
         }))}
          team1Score={gameState.team1Score}
       team2Score={gameState.team2Score}
@@ -352,6 +340,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
       team4Strikes={teamStrikes.team4}
       team5Strikes={teamStrikes.team5}
       currentQuestionIndex={gameState.currentQuestionIndex + 1}
+      question={questionData.question}
       onRevealAnswer={revealAnswer}
       arduinoConnected={connected}
       onResetBuzzer={resetBuzz}

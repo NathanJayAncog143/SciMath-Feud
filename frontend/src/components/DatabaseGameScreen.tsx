@@ -681,6 +681,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
         team4Strikes={teamStrikes.team4}
         team5Strikes={teamStrikes.team5}
         currentQuestionIndex={safeQuestionIndex}
+        question={currentQuestion.question}
         onRevealAnswer={revealAnswer}
         arduinoConnected={connected}
         onResetBuzzer={resetBuzz}

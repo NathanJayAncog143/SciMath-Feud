@@ -26,6 +26,7 @@ interface GameBoardProps {
   team4Strikes?: number;
   team5Strikes?: number;
   currentQuestionIndex?: number;
+  question?: string;
   onRevealAnswer: (index: number) => void;
   // Arduino integration
   arduinoConnected?: boolean;
@@ -57,6 +58,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   team5Strikes = 0,
   // optional, currently unused visually:
   currentQuestionIndex,
+  question,
   onRevealAnswer,
   arduinoConnected = false,
   buttonStates = [false, false, false, false, false],
@@ -504,17 +506,29 @@ const GameBoard: React.FC<GameBoardProps> = ({
       <button
         onClick={onResetBuzzer}
         disabled={!arduinoConnected || !onResetBuzzer}
-        className={`absolute top-3 left-1/2 -translate-x-1/2 z-50
-          px-6 py-3 rounded-xl font-bold text-lg shadow-xl
+        className={`absolute top-3 right-3 z-50
+          w-12 h-12 rounded-full text-2xl shadow-xl
+          flex items-center justify-center
           transition-all duration-200
           ${
             arduinoConnected && onResetBuzzer
               ? 'bg-yellow-500 hover:bg-yellow-400 text-black cursor-pointer'
               : 'bg-gray-500 text-gray-300 opacity-60 cursor-not-allowed'
           }`}
+        title="Reset Buzzers"
+        aria-label="Reset Buzzers"
       >
-        🔄 RESET BUZZERS
+        🔄
       </button>
+
+      {/* Current Question */}
+      {question && (
+        <div className="absolute top-3 left-[48%] -translate-x-1/2 z-40 max-w-[80vw] sm:max-w-2xl px-4 sm:px-6 py-2 sm:py-3 rounded-xl bg-blue-950/80 border-2 border-yellow-400 shadow-xl text-center">
+          <span className="text-white font-bold text-sm sm:text-base lg:text-lg">
+            {question}
+          </span>
+        </div>
+      )}
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute inset-0 bg-gradient-radial from-blue-600/20 to-transparent"></div>
