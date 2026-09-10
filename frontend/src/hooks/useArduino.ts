@@ -39,10 +39,11 @@ export function useArduino(options: UseArduinoOptions = {}) {
 
   const readerRef = useRef<ReadableStreamDefaultReader<string> | null>(null);
   const portRef = useRef<any | null>(null); // SerialPort
+  const connectingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const textDecoder = useRef(new TextDecoderStream());
 
   const disconnect = useCallback(async () => {
+    connectingRef.current = false;
     try {
       abortControllerRef.current?.abort();
       if (readerRef.current) {
@@ -89,18 +90,21 @@ export function useArduino(options: UseArduinoOptions = {}) {
   }, [numButtons]);
 
   const connect = useCallback(async () => {
+    if (connectingRef.current || portRef.current) return;
     if (!('serial' in navigator)) {
       setState(prev => ({ ...prev, error: 'Web Serial API not supported. Use Chrome / Edge.' }));
       return;
     }
+    connectingRef.current = true;
+    let port: any | null = null;
     try {
       setState(prev => ({ ...prev, connecting: true, error: null }));
-      const port = await (navigator as any).serial.requestPort();
+      port = await (navigator as any).serial.requestPort();
       portRef.current = port;
       await port.open({ baudRate });
 
       // Set up decoding
-      const decoder = textDecoder.current; // TextDecoderStream
+      const decoder = new TextDecoderStream();
       const readable = port.readable?.pipeThrough(decoder);
       if (!readable) throw new Error('No readable stream from serial port');
 
@@ -133,8 +137,17 @@ export function useArduino(options: UseArduinoOptions = {}) {
       });
     } catch (e: any) {
       console.error(e);
-      setState(prev => ({ ...prev, error: e.message || 'Failed to connect', connecting: false }));
+      const message = e?.message || 'Failed to connect';
+      const error = /open|busy|access|in use/i.test(message)
+        ? `Could not open the serial port. Close Arduino Serial Monitor or any other app using it, then try again. (${message})`
+        : message;
+      setState(prev => ({ ...prev, error, connecting: false }));
+      if (port && portRef.current === port) {
+        try { await port.close(); } catch {}
+      }
       await disconnect();
+    } finally {
+      connectingRef.current = false;
     }
   }, [baudRate, disconnect, parseLine]);
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import importIcon from '../assets/import icon.png';
 import { saveGameSet, generateGameCode, type GameSetQuestion, type GameSetAnswer } from '../lib/supabase';
 
 interface AdminPanelProps {
@@ -33,6 +34,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToWelcome }) => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [savedGameCode, setSavedGameCode] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const addQuestion = () => {
     setQuestions([...questions, {
@@ -75,6 +77,76 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToWelcome }) => {
       [field]: value
     };
     setQuestions(newQuestions);
+  };
+
+  const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      alert('Please select an Excel (.xlsx) file.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      const XLSX = await import('xlsx');
+
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+
+      const importedQuestions: AdminQuestion[] = rows
+        .map((row, questionIndex) => {
+          const question = String(row['Question'] ?? '').trim();
+
+          const answers: GameSetAnswer[] = [];
+
+          for (let i = 1; i <= 8; i++) {
+            const text = String(row[`Answer ${i}`] ?? '').trim();
+            const points = Number(row[`Points ${i}`] ?? 0);
+
+            if (text !== '') {
+              answers.push({
+                text,
+                points: Number.isFinite(points) ? points : 0
+              });
+            }
+          }
+
+          return {
+            question,
+            answers,
+            order_index: questionIndex
+          };
+        })
+        .filter(q => q.question !== '' && q.answers.length > 0);
+
+      if (importedQuestions.length === 0) {
+        alert(
+          'No valid questions were found. Please make sure your Excel file follows the required format.'
+        );
+        return;
+      }
+
+      setQuestions(importedQuestions);
+
+      alert(
+        `Successfully imported ${importedQuestions.length} question(s)!`
+      );
+    } catch (error) {
+      console.error('Error importing Excel file:', error);
+      alert('Failed to read the Excel file.');
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
   };
 
   const handleSaveGameSet = async () => {
@@ -208,6 +280,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToWelcome }) => {
                 </h2>
                 <p className="text-purple-200 text-sm">Add survey questions with up to 8 answers each</p>
               </div>
+              <div className="flex flex-wrap gap-3">
+
+              {/* Import Excel Button */}
+              <label
+                className={`bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-6 py-3 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center cursor-pointer ${
+                  isImporting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <img
+                  src={importIcon}
+                  alt="Import"
+                  className="w-6 h-6 mr-2 object-contain"
+                />
+
+                {isImporting ? 'Importing...' : 'Import Excel'}
+
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  onChange={handleImportExcel}
+                  disabled={isImporting}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Add Question Button */}
               <button
                 onClick={addQuestion}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold px-6 py-3 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center"
@@ -215,6 +313,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToWelcome }) => {
                 <span className="text-xl mr-2">➕</span>
                 Add Question
               </button>
+
+            </div>
             </div>
 
             <div className="space-y-8">
