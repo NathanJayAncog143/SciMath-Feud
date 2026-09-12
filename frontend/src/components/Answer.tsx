@@ -389,15 +389,15 @@ const HostControl: React.FC<HostControlProps> = ({
                         : 'bg-gray-600/50 border-gray-500/50'}`}
                 >
                   {/* Answer Content Row */}
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="flex-1 text-left font-bold text-lg text-white">
+                  <div className="flex items-center justify-between px-4 py-3 overflow-hidden">
+                    <span className="flex-1 min-w-0 pr-2 text-left font-bold text-base sm:text-lg text-white break-words [word-break:break-word]">
                       {answer.text ? answer.text : `—`}
                     </span>
-                    <span className="bg-black/40 px-3 py-1 rounded-full text-yellow-400 font-black min-w-[60px] text-center">
+                    <span className="bg-black/40 px-3 py-1 rounded-full text-yellow-400 font-black min-w-[60px] text-center shrink-0">
                       {answer.text ? answer.points : '—'}
                     </span>
                     {answer.revealed && (
-                      <span className="ml-2 text-green-300 text-sm font-bold">
+                      <span className="ml-2 text-green-300 text-sm font-bold shrink-0">
                         ✓ REVEALED
                       </span>
                     )}
@@ -436,15 +436,15 @@ const HostControl: React.FC<HostControlProps> = ({
                         : 'bg-gray-600/50 border-gray-500/50'}`}
                 >
                   {/* Answer Content Row */}
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="flex-1 text-left font-bold text-lg text-white">
+                  <div className="flex items-center justify-between px-4 py-3 overflow-hidden">
+                    <span className="flex-1 min-w-0 pr-2 text-left font-bold text-base sm:text-lg text-white break-words [word-break:break-word]">
                       {answer.text ? answer.text : `—`}
                     </span>
-                    <span className="bg-black/40 px-3 py-1 rounded-full text-yellow-400 font-black min-w-[60px] text-center">
+                    <span className="bg-black/40 px-3 py-1 rounded-full text-yellow-400 font-black min-w-[60px] text-center shrink-0">
                       {answer.text ? answer.points : '—'}
                     </span>
                     {answer.revealed && (
-                      <span className="ml-2 text-green-300 text-sm font-bold">
+                      <span className="ml-2 text-green-300 text-sm font-bold shrink-0">
                         ✓ REVEALED
                       </span>
                     )}

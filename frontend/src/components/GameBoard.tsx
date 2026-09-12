@@ -3,6 +3,105 @@ import { supabase } from '../lib/supabase';
 import themeSong from '../assets/Family Feud Theme Song (Harvey era).mp3';
 import intenseSound from '../assets/intense.mp3';
 import winningRoundSound from '../assets/winning_round.mp3';
+import buzzerSound from '../assets/family-feud-answer-buzzer.mp3';
+import playerPressSound from '../assets/player_press.mp3';
+
+import cteLogo from '../assets/cte_logo.png';
+import ctechLogo from '../assets/ctech_logo.jpg';
+import coasLogo from '../assets/coas_logo.jpg';
+import cbmLogo from '../assets/cbm_logo.jpg';
+import cfesLogo from '../assets/cfes_logo.jpg';
+
+const DEFAULT_LOGOS = [cteLogo, ctechLogo, coasLogo, cbmLogo, cfesLogo];
+
+function getTeamLogo(teamName?: string, teamIndex: number = 0): string {
+  if (teamIndex === 0) return cteLogo;
+  if (teamIndex === 1) return ctechLogo;
+  if (teamIndex === 2) return coasLogo;
+  if (teamIndex === 3) return cbmLogo;
+  if (teamIndex === 4) return cfesLogo;
+
+  if (teamName) {
+    const upper = teamName.toUpperCase().trim();
+    if (upper.includes('CTECH') || upper.includes('TECHNOLOGY')) return ctechLogo;
+    if (upper.includes('CTE') || upper.includes('TEACHER')) return cteLogo;
+    if (upper.includes('COAS') || upper.includes('AGRICULTUR')) return coasLogo;
+    if (upper.includes('CBM') || upper.includes('BUSINESS') || upper.includes('MANAGEMENT')) return cbmLogo;
+    if (upper.includes('CFES') || upper.includes('FORESTRY') || upper.includes('ENVIRONMENT')) return cfesLogo;
+  }
+
+  return DEFAULT_LOGOS[teamIndex] || cteLogo;
+}
+
+interface CollegeTheme {
+  name: string;
+  shortName: string;
+  emojis: string[];
+  motto: string;
+  cardBg: string;
+  badgeBg: string;
+  textColor: string;
+  borderColor: string;
+  glowColor: string;
+}
+
+const COLLEGE_THEMES: Record<number, CollegeTheme> = {
+  0: {
+    name: 'College of Teacher Education',
+    shortName: 'CTE',
+    emojis: ['🎓', '📚', '🍎', '💡', '✍️', '🏆', '⚡', '🔒'],
+    motto: 'Molding Future Educators & Leaders!',
+    cardBg: 'from-rose-950/95 via-red-900/98 to-slate-950/95',
+    badgeBg: 'from-amber-400 via-rose-400 to-red-500',
+    textColor: 'text-amber-300',
+    borderColor: 'border-yellow-400',
+    glowColor: 'rgba(244,63,94,0.95)',
+  },
+  1: {
+    name: 'College of Technology',
+    shortName: 'CTECH',
+    emojis: ['💻', '🤖', '⚙️', '🚀', '🔧', '🏆', '⚡', '🔒'],
+    motto: 'Innovating Technology & Engineering!',
+    cardBg: 'from-slate-950/95 via-blue-950/98 to-cyan-950/95',
+    badgeBg: 'from-cyan-400 via-sky-300 to-blue-500',
+    textColor: 'text-cyan-300',
+    borderColor: 'border-cyan-400',
+    glowColor: 'rgba(6,182,212,0.95)',
+  },
+  2: {
+    name: 'College of Agricultural Sciences',
+    shortName: 'COAS',
+    emojis: ['🌾', '🌱', '🚜', '🌳', '🍃', '🏆', '⚡', '🔒'],
+    motto: 'Nurturing Agriculture & Life Sciences!',
+    cardBg: 'from-slate-950/95 via-emerald-950/98 to-green-950/95',
+    badgeBg: 'from-emerald-400 via-green-300 to-lime-400',
+    textColor: 'text-emerald-300',
+    borderColor: 'border-emerald-400',
+    glowColor: 'rgba(16,185,129,0.95)',
+  },
+  3: {
+    name: 'College of Business & Management',
+    shortName: 'CBM',
+    emojis: ['💼', '📊', '📈', '💰', '💵', '🏆', '⚡', '🔒'],
+    motto: 'Empowering Business Leaders & Entrepreneurs!',
+    cardBg: 'from-slate-950/95 via-purple-950/98 to-indigo-950/95',
+    badgeBg: 'from-purple-400 via-indigo-300 to-amber-400',
+    textColor: 'text-purple-300',
+    borderColor: 'border-purple-400',
+    glowColor: 'rgba(168,85,247,0.95)',
+  },
+  4: {
+    name: 'College of Forestry & Environmental Sciences',
+    shortName: 'CFES',
+    emojis: ['🌲', '🦅', '🦉', '🌿', '⛰️', '🏆', '⚡', '🔒'],
+    motto: 'Protecting Nature & Forestry Excellence!',
+    cardBg: 'from-slate-950/95 via-amber-950/98 to-yellow-950/95',
+    badgeBg: 'from-yellow-400 via-amber-400 to-emerald-500',
+    textColor: 'text-yellow-300',
+    borderColor: 'border-yellow-400',
+    glowColor: 'rgba(234,179,8,0.95)',
+  },
+};
 
 interface GameBoardProps {
   answers: Array<{
@@ -166,6 +265,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
       
       // All guards passed - trigger celebration (same duration for regular and steal attempts)
       setCelebratingTeam(buzzWinnerIndex);
+      playHostSound(buzzerAudioRef.current, 'buzzer');
       
       // Set cleanup timeout with proper reference tracking (full 3 seconds)
       celebrationTimeoutRef.current = setTimeout(() => {
@@ -240,6 +340,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
   const themeAudioRef = useRef<HTMLAudioElement | null>(null);
   const intenseAudioRef = useRef<HTMLAudioElement | null>(null);
   const winningRoundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const buzzerAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playerPressAudioRef = useRef<HTMLAudioElement | null>(null);
   const activeEffectAudioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
@@ -248,6 +350,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
     themeAudioRef.current = new Audio(themeSong);
     intenseAudioRef.current = new Audio(intenseSound);
     winningRoundAudioRef.current = new Audio(winningRoundSound);
+    buzzerAudioRef.current = new Audio(buzzerSound);
+    playerPressAudioRef.current = new Audio(playerPressSound);
 
     // Set volume levels
     if (themeAudioRef.current) {
@@ -256,6 +360,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
     }
     if (intenseAudioRef.current) intenseAudioRef.current.volume = 0.7;
     if (winningRoundAudioRef.current) winningRoundAudioRef.current.volume = 0.8;
+    if (buzzerAudioRef.current) buzzerAudioRef.current.volume = 0.9;
+    if (playerPressAudioRef.current) playerPressAudioRef.current.volume = 0.8;
     if (intenseAudioRef.current) intenseAudioRef.current.loop = true;
 
     return () => {
@@ -271,6 +377,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
       if (winningRoundAudioRef.current) {
         winningRoundAudioRef.current.pause();
         winningRoundAudioRef.current = null;
+      }
+      if (buzzerAudioRef.current) {
+        buzzerAudioRef.current.pause();
+        buzzerAudioRef.current = null;
+      }
+      if (playerPressAudioRef.current) {
+        playerPressAudioRef.current.pause();
+        playerPressAudioRef.current = null;
       }
     };
   }, []);
@@ -500,14 +614,146 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return classes;
   };
 
+  const getTeamNameByIndex = (index: number | null | undefined) => {
+    if (index === null || index === undefined) return '';
+    switch (index) {
+      case 0: return team1Name || 'CTE (College of Teacher Education)';
+      case 1: return team2Name || 'CTECH (College of Technology)';
+      case 2: return team3Name || 'COAS (College of Agricultural Sciences)';
+      case 3: return team4Name || 'CBM (College of Business & Management)';
+      case 4: return team5Name || 'CFES (College of Forestry & Environmental Sciences)';
+      default: return `Team ${index + 1}`;
+    }
+  };
+
   return (
     <div className="w-screen h-screen fixed inset-0 overflow-hidden bg-gradient-to-b from-blue-800 via-blue-900 to-blue-950 flex items-center justify-center">
+      {/* College Logo Lock-In Overlay Modal on top of the game board with visual effects & fitting emojis */}
+      {(buzzWinnerIndex !== null && buzzWinnerIndex !== undefined && buzzWinnerIndex >= 0 && buzzWinnerIndex <= 4) && (() => {
+        const theme = COLLEGE_THEMES[buzzWinnerIndex] || COLLEGE_THEMES[0];
+        const collegeName = getTeamNameByIndex(buzzWinnerIndex);
+        const teamLogo = getTeamLogo(collegeName, buzzWinnerIndex);
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300 animate-pop-in overflow-hidden">
+            
+            {/* Spinning Conic Ray / Light Beams Effect */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+              <div 
+                className="w-[160vw] h-[160vw] animate-spin-slow rounded-full opacity-60"
+                style={{
+                  background: 'conic-gradient(from 0deg, transparent 0deg, rgba(250, 204, 21, 0.4) 20deg, transparent 40deg, rgba(250, 204, 21, 0.4) 60deg, transparent 80deg, rgba(250, 204, 21, 0.4) 100deg, transparent 120deg, rgba(250, 204, 21, 0.4) 140deg, transparent 160deg, rgba(250, 204, 21, 0.4) 180deg, transparent 200deg, rgba(250, 204, 21, 0.4) 220deg, transparent 240deg, rgba(250, 204, 21, 0.4) 260deg, transparent 280deg, rgba(250, 204, 21, 0.4) 300deg, transparent 320deg, rgba(250, 204, 21, 0.4) 340deg, transparent 360deg)'
+                }}
+              />
+            </div>
+
+            {/* Radial Light Glow Effect */}
+            <div className="absolute inset-0 bg-gradient-radial from-yellow-500/30 via-blue-950/40 to-black/80 animate-pulse pointer-events-none" />
+
+            {/* Floating Orbit Emojis around screen background */}
+            <div className="absolute top-10 left-8 sm:left-14 text-4xl sm:text-5xl lg:text-6xl animate-float-around pointer-events-none drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" style={{ animationDelay: '0s' }}>
+              {theme.emojis[0]}
+            </div>
+            <div className="absolute top-12 right-10 sm:right-16 text-4xl sm:text-5xl lg:text-6xl animate-float-around pointer-events-none drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" style={{ animationDelay: '0.5s' }}>
+              {theme.emojis[1]}
+            </div>
+            <div className="absolute bottom-16 left-10 sm:left-16 text-4xl sm:text-5xl lg:text-6xl animate-float-around pointer-events-none drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" style={{ animationDelay: '1s' }}>
+              {theme.emojis[2]}
+            </div>
+            <div className="absolute bottom-14 right-12 sm:right-18 text-4xl sm:text-5xl lg:text-6xl animate-float-around pointer-events-none drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" style={{ animationDelay: '1.5s' }}>
+              {theme.emojis[3]}
+            </div>
+
+            <div className="absolute top-1/3 left-4 sm:left-12 text-3xl sm:text-4xl animate-bounce pointer-events-none" style={{ animationDuration: '3s' }}>
+              ⚡
+            </div>
+            <div className="absolute top-1/3 right-4 sm:right-12 text-3xl sm:text-4xl animate-bounce pointer-events-none" style={{ animationDuration: '2.5s' }}>
+              🔒
+            </div>
+
+            {/* Main Lock-In Floating Card */}
+            <div className={`relative flex flex-col items-center justify-center p-6 sm:p-8 lg:p-10 bg-gradient-to-b ${theme.cardBg} rounded-3xl border-4 sm:border-6 ${theme.borderColor} shadow-[0_0_120px_rgba(250,204,21,0.95)] max-w-sm sm:max-w-md lg:max-w-xl w-[90vw] text-center transform transition-all duration-300 z-20`}>
+              
+              {/* Outer Dual Expanding Ripple Rings */}
+              <div className="absolute -inset-4 rounded-3xl border-4 border-yellow-400 animate-ping opacity-50 pointer-events-none"></div>
+              <div className="absolute -inset-8 rounded-3xl border-2 border-cyan-400 animate-pulse opacity-40 pointer-events-none"></div>
+
+              {/* Top Glowing Header Badge */}
+              <div className={`bg-gradient-to-r ${theme.badgeBg} text-slate-950 font-black px-6 sm:px-8 py-2 rounded-full text-xs sm:text-sm lg:text-base uppercase tracking-widest shadow-[0_0_30px_rgba(250,204,21,0.9)] mb-3 animate-pulse flex items-center justify-center gap-2`}>
+                <span>🚨</span>
+                <span>⚡</span>
+                <span>BUZZER LOCKED IN!</span>
+                <span>⚡</span>
+                <span>🚨</span>
+              </div>
+
+              {/* Crown Badge */}
+              <div className="text-4xl sm:text-5xl -mb-3 z-20 animate-bounce">
+                👑
+              </div>
+
+              {/* College Logo Image Container with Double Rotating Rings & Lock Badge */}
+              <div className="relative my-3 flex items-center justify-center">
+                {/* Rotating Outer Dashed Ring */}
+                <div className="absolute -inset-5 rounded-full border-4 border-dashed border-yellow-300 animate-spin-slow pointer-events-none"></div>
+                {/* Reverse Rotating Inner Dotted Ring */}
+                <div className="absolute -inset-2.5 rounded-full border-3 border-dotted border-cyan-300 animate-spin-reverse-slow pointer-events-none"></div>
+                
+                {/* Logo Frame */}
+                <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-56 lg:h-56 rounded-full border-4 sm:border-6 border-yellow-300 shadow-[0_0_80px_rgba(255,255,255,1)] overflow-hidden bg-white p-2.5 flex items-center justify-center z-10 transform hover:scale-105 transition-transform">
+                  <img
+                    src={teamLogo}
+                    alt={collegeName}
+                    className="w-full h-full object-cover rounded-full shadow-inner transform scale-105"
+                  />
+                </div>
+
+                {/* Overlaid Lock Badge on Logo */}
+                <div className="absolute -bottom-3 z-30 bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 text-blue-950 font-black px-4 py-1 rounded-full text-xs sm:text-sm shadow-xl border-2 border-white animate-bounce flex items-center gap-1.5">
+                  <span>🔒</span>
+                  <span>LOCKED IN</span>
+                  <span>⚡</span>
+                </div>
+              </div>
+
+              {/* College Name Display */}
+              <div className="text-yellow-300 font-black text-2xl sm:text-3xl lg:text-4xl mt-4 tracking-wide drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)] uppercase flex items-center justify-center gap-2">
+                <span>🏆</span>
+                <span>{theme.shortName}</span>
+                <span>🏆</span>
+              </div>
+
+              {/* Full College Name */}
+              <div className="text-white font-extrabold text-sm sm:text-base lg:text-lg mt-1 tracking-wide text-amber-200 opacity-95">
+                {collegeName}
+              </div>
+
+              {/* College Motto */}
+              <div className="text-cyan-200 text-xs sm:text-sm italic mt-1 font-semibold flex items-center justify-center gap-1">
+                <span>{theme.emojis[0]}</span>
+                <span>"{theme.motto}"</span>
+                <span>{theme.emojis[1]}</span>
+              </div>
+
+              {/* Subtitle Status with Fitting Emojis */}
+              <div className="bg-blue-950/80 border border-yellow-400/60 rounded-xl px-4 py-2 mt-4 text-yellow-200 font-black text-xs sm:text-sm lg:text-base tracking-wider flex items-center justify-center gap-2 shadow-inner">
+                <span>⚡</span>
+                <span>READY TO ANSWER THE QUESTION!</span>
+                <span>🧠</span>
+                <span>💡</span>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Reset Buzzer Button */}
       <button
         onClick={onResetBuzzer}
         disabled={!arduinoConnected || !onResetBuzzer}
         className={`absolute top-3 right-3 z-50
-          w-12 h-12 rounded-full text-2xl shadow-xl
+          h-10 px-4 rounded-full text-xs font-bold tracking-wider shadow-xl
           flex items-center justify-center
           transition-all duration-200
           ${
@@ -518,7 +764,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
         title="Reset Buzzers"
         aria-label="Reset Buzzers"
       >
-        🔄
+        RESET
       </button>
 
       {/* Current Question */}
@@ -541,12 +787,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
         ></div>
       </div>
 
-      {/* Ambient glows */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-radial from-yellow-300/20 via-yellow-400/10 to-transparent rounded-full animate-pulse"></div>
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-radial from-orange-300/20 via-orange-400/10 to-transparent rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-gradient-radial from-red-300/15 via-red-400/8 to-transparent rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-radial from-blue-300/15 via-blue-400/8 to-transparent rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+      {/* Still Ambient Glows (No animation) */}
+      <div className="absolute inset-0 pointer-events-none opacity-60">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-radial from-yellow-300/20 via-yellow-400/10 to-transparent rounded-full"></div>
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-radial from-orange-300/20 via-orange-400/10 to-transparent rounded-full"></div>
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-gradient-radial from-red-300/15 via-red-400/8 to-transparent rounded-full"></div>
+        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-radial from-blue-300/15 via-blue-400/8 to-transparent rounded-full"></div>
       </div>
 
       <div className="relative z-10 w-full h-full flex flex-col px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-6">
@@ -560,6 +806,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(0, "bg-gradient-to-br from-red-700 to-red-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(1, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
+                
+                {/* College Logo Badge */}
+                <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-yellow-300 overflow-hidden bg-white p-0.5 shadow-md z-10 mb-0.5 flex items-center justify-center">
+                  <img src={getTeamLogo(team1Name, 0)} alt={team1Name || 'CTE'} className="w-full h-full object-cover rounded-full transform scale-105" />
+                </div>
+
                 <div
                   className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
                     buzzWinnerIndex === 0
@@ -568,12 +820,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   }`}
                 >
                   {buzzWinnerIndex === 0 && (
-                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
-                      ⚡ BUZZED FIRST!
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1 flex items-center justify-center gap-1">
+                      <span>⚡</span> BUZZED FIRST! <span>⚡</span>
                     </div>
                   )}
 
-                  {team1Name || 'Team 1'}
+                  {team1Name || 'CTE'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
                   {team1Score}
@@ -590,6 +842,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(2, "bg-gradient-to-br from-green-700 to-green-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(3, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
+                
+                {/* College Logo Badge */}
+                <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-yellow-300 overflow-hidden bg-white p-0.5 shadow-md z-10 mb-0.5 flex items-center justify-center">
+                  <img src={getTeamLogo(team3Name, 2)} alt={team3Name || 'COAS'} className="w-full h-full object-cover rounded-full transform scale-105" />
+                </div>
+
                 <div
                   className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
                     buzzWinnerIndex === 2
@@ -598,8 +856,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   }`}
                 >
                   {buzzWinnerIndex === 2 && (
-                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
-                      ⚡ BUZZED FIRST!
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1 flex items-center justify-center gap-1">
+                      <span>⚡</span> BUZZED FIRST! <span>⚡</span>
                     </div>
                   )}
 
@@ -631,17 +889,23 @@ const GameBoard: React.FC<GameBoardProps> = ({
                           className={`relative cursor-pointer transition-all duration-300 ${answer.revealed ? 'transform scale-105' : 'hover:scale-105'}`}
                           onClick={() => handleAnswerClick(index)}
                         >
-                          <div className={`flex items-center justify-between h-8 sm:h-10 lg:h-12 xl:h-14 px-3 sm:px-4 lg:px-5 rounded-lg border-2 ${
+                          <div className={`flex items-center justify-between h-8 sm:h-10 lg:h-12 xl:h-14 px-3 sm:px-4 lg:px-5 rounded-lg border-2 overflow-hidden ${
                             answer.revealed
                               ? 'bg-gradient-to-r from-blue-500 to-blue-600 border-white text-white shadow-xl'
                               : 'bg-gradient-to-r from-blue-800 to-blue-900 border-blue-600 text-gray-300 hover:bg-blue-700'
                           }`}>
-                            <div className="flex items-center flex-1">
-                              <span className="font-bold text-sm sm:text-base lg:text-lg uppercase tracking-wide">
+                            <div className="flex items-center flex-1 min-w-0 pr-2 overflow-hidden">
+                              <span className={`font-bold uppercase tracking-wide break-words [word-break:break-word] line-clamp-2 leading-tight ${
+                                answer.revealed && answer.text.length > 25
+                                  ? 'text-[10px] sm:text-xs lg:text-sm'
+                                  : answer.revealed && answer.text.length > 15
+                                  ? 'text-xs sm:text-sm lg:text-base'
+                                  : 'text-sm sm:text-base lg:text-lg'
+                              }`}>
                                 {answer.revealed ? answer.text : `${index + 1}`}
                               </span>
                             </div>
-                            <div className="bg-blue-900 px-2 sm:px-3 lg:px-4 py-1 rounded border-l-2 border-blue-600 min-w-[30px] sm:min-w-[40px] lg:min-w-[50px] text-center">
+                            <div className="bg-blue-900 px-2 sm:px-3 lg:px-4 py-1 rounded border-l-2 border-blue-600 min-w-[30px] sm:min-w-[40px] lg:min-w-[50px] text-center shrink-0 ml-2">
                               <span className="font-black text-sm sm:text-base lg:text-lg">
                                 {answer.revealed ? answer.points : ''}
                               </span>
@@ -659,17 +923,23 @@ const GameBoard: React.FC<GameBoardProps> = ({
                           className={`relative cursor-pointer transition-all duration-300 ${answer.revealed ? 'transform scale-105' : 'hover:scale-105'}`}
                           onClick={() => handleAnswerClick(index + 4)}
                         >
-                          <div className={`flex items-center justify-between h-8 sm:h-10 lg:h-12 xl:h-14 px-3 sm:px-4 lg:px-5 rounded-lg border-2 ${
+                          <div className={`flex items-center justify-between h-8 sm:h-10 lg:h-12 xl:h-14 px-3 sm:px-4 lg:px-5 rounded-lg border-2 overflow-hidden ${
                             answer.revealed
                               ? 'bg-gradient-to-r from-blue-500 to-blue-600 border-white text-white shadow-xl'
                               : 'bg-gradient-to-r from-blue-800 to-blue-900 border-blue-600 text-gray-300 hover:bg-blue-700'
                           }`}>
-                            <div className="flex items-center flex-1">
-                              <span className="font-bold text-sm sm:text-base lg:text-lg uppercase tracking-wide">
+                            <div className="flex items-center flex-1 min-w-0 pr-2 overflow-hidden">
+                              <span className={`font-bold uppercase tracking-wide break-words [word-break:break-word] line-clamp-2 leading-tight ${
+                                answer.revealed && answer.text.length > 25
+                                  ? 'text-[10px] sm:text-xs lg:text-sm'
+                                  : answer.revealed && answer.text.length > 15
+                                  ? 'text-xs sm:text-sm lg:text-base'
+                                  : 'text-sm sm:text-base lg:text-lg'
+                              }`}>
                                 {answer.revealed ? answer.text : `${index + 5}`}
                               </span>
                             </div>
-                            <div className="bg-blue-900 px-2 sm:px-3 lg:px-4 py-1 rounded border-l-2 border-blue-600 min-w-[30px] sm:min-w-[40px] lg:min-w-[50px] text-center">
+                            <div className="bg-blue-900 px-2 sm:px-3 lg:px-4 py-1 rounded border-l-2 border-blue-600 min-w-[30px] sm:min-w-[40px] lg:min-w-[50px] text-center shrink-0 ml-2">
                               <span className="font-black text-sm sm:text-base lg:text-lg">
                                 {answer.revealed ? answer.points : ''}
                               </span>
@@ -689,6 +959,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(1, "bg-gradient-to-br from-blue-700 to-blue-800 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(2, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
+                
+                {/* College Logo Badge */}
+                <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-yellow-300 overflow-hidden bg-white p-0.5 shadow-md z-10 mb-0.5 flex items-center justify-center">
+                  <img src={getTeamLogo(team2Name, 1)} alt={team2Name || 'CTECH'} className="w-full h-full object-cover rounded-full transform scale-105" />
+                </div>
+
                 <div
                   className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
                     buzzWinnerIndex === 1
@@ -697,12 +973,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   }`}
                 >
                   {buzzWinnerIndex === 1 && (
-                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
-                      ⚡ BUZZED FIRST!
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1 flex items-center justify-center gap-1">
+                      <span>⚡</span> BUZZED FIRST! <span>⚡</span>
                     </div>
                   )}
 
-                  {team2Name || 'Team 2'}
+                  {team2Name || 'CTECH'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
                   {team2Score}
@@ -719,6 +995,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div className={teamHighlight(3, "bg-gradient-to-br from-red-900 to-red-950 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
                 <div className={getTeamBoxClasses(4, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
                 <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
+                
+                {/* College Logo Badge */}
+                <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-yellow-300 overflow-hidden bg-white p-0.5 shadow-md z-10 mb-0.5 flex items-center justify-center">
+                  <img src={getTeamLogo(team4Name, 3)} alt={team4Name || 'CBM'} className="w-full h-full object-cover rounded-full transform scale-105" />
+                </div>
+
                 <div
                   className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
                     buzzWinnerIndex === 3
@@ -727,12 +1009,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   }`}
                 >
                   {buzzWinnerIndex === 3 && (
-                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
-                      ⚡ BUZZED FIRST!
+                    <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1 flex items-center justify-center gap-1">
+                      <span>⚡</span> BUZZED FIRST! <span>⚡</span>
                     </div>
                   )}
 
-                  {team4Name || 'Team 4'}
+                  {team4Name || 'CBM'}
                 </div>
                 <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
                   {team4Score}
@@ -748,10 +1030,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
           </div>
 
           {/* Team 5 at bottom */}
-          <div className="flex justify-center mt-4 sm:mt-6">
-            <div className={teamHighlight(4, "bg-gradient-to-br from-yellow-600 to-yellow-700 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-24 sm:w-32 lg:w-40 xl:w-44 h-20 sm:h-24 lg:h-28 xl:h-32 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
+          <div className="flex justify-center mt-3 sm:mt-4">
+            <div className={teamHighlight(4, "bg-gradient-to-br from-yellow-600 to-yellow-700 border-2 sm:border-3 lg:border-4 border-yellow-400 rounded-xl lg:rounded-2xl w-20 sm:w-28 lg:w-36 xl:w-40 h-24 sm:h-32 lg:h-40 xl:h-44 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden transition-all duration-200")}>
               <div className={getTeamBoxClasses(5, "absolute inset-0 rounded-xl lg:rounded-2xl")}></div>
               <div className="absolute inset-1 sm:inset-2 border-2 border-dotted border-yellow-300 rounded-lg lg:rounded-xl"></div>
+              
+              {/* College Logo Badge */}
+              <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-yellow-300 overflow-hidden bg-white p-0.5 shadow-md z-10 mb-0.5 flex items-center justify-center">
+                <img src={getTeamLogo(team5Name, 4)} alt={team5Name || 'CFES'} className="w-full h-full object-cover rounded-full transform scale-105" />
+              </div>
+
               <div
                 className={`font-bold text-xs sm:text-sm lg:text-base xl:text-lg drop-shadow-lg z-10 mb-1 text-center px-1 ${
                   buzzWinnerIndex === 4
@@ -760,12 +1048,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 }`}
               >
                 {buzzWinnerIndex === 4 && (
-                  <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1">
-                    ⚡ BUZZED FIRST!
+                  <div className="text-yellow-300 text-[9px] sm:text-xs font-black animate-pulse mb-1 flex items-center justify-center gap-1">
+                    <span>⚡</span> BUZZED FIRST! <span>⚡</span>
                   </div>
                 )}
 
-                {team5Name || 'Team 5'}
+                {team5Name || 'CFES'}
               </div>
               <div className="text-yellow-400 font-black text-lg sm:text-2xl lg:text-3xl xl:text-4xl drop-shadow-2xl z-10 mb-1">
                 {team5Score}
