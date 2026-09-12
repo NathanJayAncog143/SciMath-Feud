@@ -15,12 +15,7 @@ import cfesLogo from '../assets/cfes_logo.jpg';
 const DEFAULT_LOGOS = [cteLogo, ctechLogo, coasLogo, cbmLogo, cfesLogo];
 
 function getTeamLogo(teamName?: string, teamIndex: number = 0): string {
-  if (teamIndex === 0) return cteLogo;
-  if (teamIndex === 1) return ctechLogo;
-  if (teamIndex === 2) return coasLogo;
-  if (teamIndex === 3) return cbmLogo;
-  if (teamIndex === 4) return cfesLogo;
-
+  // Always prioritise the actual team NAME so logos follow the college, not the slot
   if (teamName) {
     const upper = teamName.toUpperCase().trim();
     if (upper.includes('CTECH') || upper.includes('TECHNOLOGY')) return ctechLogo;
@@ -30,8 +25,10 @@ function getTeamLogo(teamName?: string, teamIndex: number = 0): string {
     if (upper.includes('CFES') || upper.includes('FORESTRY') || upper.includes('ENVIRONMENT')) return cfesLogo;
   }
 
-  return DEFAULT_LOGOS[teamIndex] || cteLogo;
+  // Fallback: use default order by slot index
+  return DEFAULT_LOGOS[teamIndex] ?? cteLogo;
 }
+
 
 interface CollegeTheme {
   name: string;
@@ -747,25 +744,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
           </div>
         );
       })()}
-
-      {/* Reset Buzzer Button */}
-      <button
-        onClick={onResetBuzzer}
-        disabled={!arduinoConnected || !onResetBuzzer}
-        className={`absolute top-3 right-3 z-50
-          h-10 px-4 rounded-full text-xs font-bold tracking-wider shadow-xl
-          flex items-center justify-center
-          transition-all duration-200
-          ${
-            arduinoConnected && onResetBuzzer
-              ? 'bg-yellow-500 hover:bg-yellow-400 text-black cursor-pointer'
-              : 'bg-gray-500 text-gray-300 opacity-60 cursor-not-allowed'
-          }`}
-        title="Reset Buzzers"
-        aria-label="Reset Buzzers"
-      >
-        RESET
-      </button>
 
       {/* Current Question */}
       {question && (

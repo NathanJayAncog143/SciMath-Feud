@@ -43,9 +43,17 @@ interface HostControlProps {
   onTriggerIntenseSound?: () => void;
   onTriggerWinningSound?: () => void;
   onTriggerStopSounds?: () => void;
+  onResetBuzzer?: () => void;
+  arduinoConnected?: boolean;
+  // Full buzzer controls
+  onConnectBuzzer?: () => void;
+  onDisconnectBuzzer?: () => void;
+  buzzerConnecting?: boolean;
+  buzzerButtonStates?: boolean[];
+  buzzerError?: string | null;
 }
 const HostControl: React.FC<HostControlProps> = ({
-  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds
+  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds, onResetBuzzer, arduinoConnected = false, onConnectBuzzer, onDisconnectBuzzer, buzzerConnecting = false, buzzerButtonStates = [], buzzerError = null
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<number>(1);
   const [customScore, setCustomScore] = useState<string>('');
@@ -218,6 +226,60 @@ const HostControl: React.FC<HostControlProps> = ({
               </button>
             </div>
           )}
+
+          {/* Buzzer Controls Panel */}
+          <div className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-white/20">
+            <div className="text-white text-xs font-bold mb-3 text-center">BUZZER CONTROLS</div>
+            <div className="flex flex-col gap-2">
+              {/* Connect/Disconnect */}
+              <button
+                onClick={arduinoConnected ? onDisconnectBuzzer : onConnectBuzzer}
+                disabled={buzzerConnecting}
+                className={`px-3 py-2 rounded-md text-xs font-semibold shadow-md transition-all duration-200 transform hover:scale-105 ${
+                  arduinoConnected
+                    ? 'bg-gradient-to-br from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white'
+                    : buzzerConnecting
+                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-70'
+                    : 'bg-gradient-to-br from-indigo-600 to-indigo-800 hover:from-indigo-500 hover:to-indigo-700 text-white'
+                }`}
+                title={arduinoConnected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
+              >
+                {buzzerConnecting ? 'Connecting...' : arduinoConnected ? '🔌 Disconnect' : '🎮 Connect'}
+              </button>
+
+              {/* Reset Buzz */}
+              {arduinoConnected && (
+                <button
+                  onClick={onResetBuzzer}
+                  disabled={!onResetBuzzer}
+                  className="px-3 py-2 bg-gradient-to-br from-yellow-500 to-yellow-700 hover:from-yellow-400 hover:to-yellow-600 text-black rounded-md text-xs font-semibold shadow-md transition-all duration-200 transform hover:scale-105"
+                  title="Reset Buzzers"
+                >
+                  🔄 Reset Buzz
+                </button>
+              )}
+
+              {/* Button state dots */}
+              {arduinoConnected && buzzerButtonStates.length > 0 && (
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  {buzzerButtonStates.map((b, i) => (
+                    <div
+                      key={i}
+                      className={`w-4 h-4 rounded-full border border-white/30 transition-all ${
+                        b ? 'bg-yellow-300 animate-pulse shadow-[0_0_6px_rgba(253,224,71,0.9)]' : 'bg-gray-600'
+                      }`}
+                      title={`Team ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Error message */}
+              {buzzerError && (
+                <div className="text-red-300 text-[10px] max-w-[120px] leading-tight">{buzzerError}</div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Custom Score Panel */}

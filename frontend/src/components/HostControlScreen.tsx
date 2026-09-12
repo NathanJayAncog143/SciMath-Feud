@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import HostControl from './Answer';
 import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, triggerGameSound, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
+import { useArduino } from '../hooks/useArduino';
 
 interface HostControlScreenProps {
   onBackToWelcome: () => void;
@@ -46,6 +47,21 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     team5Strikes: number;
   } | null>(null);
   const [hasStrikeUndo, setHasStrikeUndo] = useState(false);
+
+  // Arduino buzzer controls — host can manage buzzer from this panel
+  const {
+    connected: arduinoConnected,
+    connecting: arduinoConnecting,
+    error: arduinoError,
+    buttonStates: arduinoButtonStates,
+    connect: connectArduino,
+    disconnect: disconnectArduino,
+    resetBuzzer: resetArduinoBuzzer,
+  } = useArduino({ baudRate: 9600, numButtons: 5 });
+
+  const handleResetBuzzer = () => {
+    resetArduinoBuzzer();
+  };
 
   // Poll game data for real-time updates
   const pollGameData = async () => {
@@ -742,6 +758,13 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
       onTriggerIntenseSound={triggerIntenseSound}
       onTriggerWinningSound={triggerWinningSound}
       onTriggerStopSounds={triggerStopSounds}
+      onResetBuzzer={handleResetBuzzer}
+      arduinoConnected={arduinoConnected}
+      onConnectBuzzer={connectArduino}
+      onDisconnectBuzzer={disconnectArduino}
+      buzzerConnecting={arduinoConnecting}
+      buzzerButtonStates={arduinoButtonStates}
+      buzzerError={arduinoError}
     />
   );
 };

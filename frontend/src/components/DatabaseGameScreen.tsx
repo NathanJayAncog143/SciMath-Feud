@@ -603,66 +603,6 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
   }));
 
   return (
-    <div className="relative">
-      {/* Arduino Controls - collapsible top-left */}
-      <div className="fixed top-2 left-2 z-50">
-        {/* Collapsed state - small icon button */}
-        {!buzzerControlsExpanded && (
-          <button
-            onClick={() => setBuzzerControlsExpanded(true)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${
-              connected ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'
-            }`}
-            title={connected ? 'Buzzers Connected' : 'Buzzers Disconnected'}
-          >
-            {connected ? '🎮' : '🔌'}
-          </button>
-        )}
-        
-        {/* Expanded state - full controls */}
-        {buzzerControlsExpanded && (
-          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-white text-sm font-semibold">Buzzer Controls</span>
-              <button
-                onClick={() => setBuzzerControlsExpanded(false)}
-                className="text-white/60 hover:text-white text-lg leading-none"
-                title="Collapse"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => connected ? disconnect() : connect()}
-                className={`px-4 py-2 rounded-md text-sm font-semibold shadow-md transition-colors ${connected ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
-                disabled={connecting}
-              >
-                {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
-              </button>
-              
-              {connected && (
-                <div className="flex gap-2">
-                  <button onClick={resetBuzz} className="px-3 py-1 rounded-md text-xs font-semibold shadow bg-yellow-600 hover:bg-yellow-700 text-white">Reset Buzz</button>
-                  <button onClick={clearLog} className="px-3 py-1 rounded-md text-xs font-semibold shadow bg-gray-600 hover:bg-gray-700 text-white">Clear Log</button>
-                </div>
-              )}
-              
-              {arduinoError && <div className="text-xs text-red-300 max-w-[200px]">{arduinoError}</div>}
-              
-              {connected && (
-                <div className="flex items-center gap-1">
-                  {buttonStates.map((b, i) => (
-                    <div key={i} className={`w-4 h-4 rounded-full ${b ? 'bg-yellow-300 animate-pulse' : 'bg-gray-600'}`} title={`B${i+1}`}></div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
       <GameBoard
         answers={answersWithRevealState}
         team1Score={gameState.team1Score}
@@ -691,7 +631,6 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
         showStrikeAnimation={showStrikeAnimation}
         gameId={game?.id}
       />
-    </div>
   );
 };
 
