@@ -59,8 +59,16 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     resetBuzzer: resetArduinoBuzzer,
   } = useArduino({ baudRate: 9600, numButtons: 5 });
 
-  const handleResetBuzzer = () => {
+  const handleResetBuzzer = async () => {
     resetArduinoBuzzer();
+    if (game?.id) {
+      try {
+        await triggerGameSound(game.id, 'stop');
+        console.log('Buzzer reset signal broadcast to game board');
+      } catch (error) {
+        console.error('Error broadcasting buzzer reset:', error);
+      }
+    }
   };
 
   // Poll game data for real-time updates

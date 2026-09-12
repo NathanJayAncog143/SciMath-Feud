@@ -100,6 +100,18 @@ const COLLEGE_THEMES: Record<number, CollegeTheme> = {
   },
 };
 
+function getCollegeTheme(teamName?: string, teamIndex: number = 0): CollegeTheme {
+  if (teamName) {
+    const upper = teamName.toUpperCase().trim();
+    if (upper.includes('CTECH') || upper.includes('TECHNOLOGY')) return COLLEGE_THEMES[1];
+    if (upper.includes('CTE') || upper.includes('TEACHER')) return COLLEGE_THEMES[0];
+    if (upper.includes('COAS') || upper.includes('AGRICULTUR')) return COLLEGE_THEMES[2];
+    if (upper.includes('CBM') || upper.includes('BUSINESS') || upper.includes('MANAGEMENT')) return COLLEGE_THEMES[3];
+    if (upper.includes('CFES') || upper.includes('FORESTRY') || upper.includes('ENVIRONMENT')) return COLLEGE_THEMES[4];
+  }
+  return COLLEGE_THEMES[teamIndex] ?? COLLEGE_THEMES[0];
+}
+
 interface GameBoardProps {
   answers: Array<{
     text: string;
@@ -506,13 +518,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
           playHostSound(winningRoundAudioRef.current, 'winning');
         }
 
-        // Check for stop sounds trigger
+        // Check for stop sounds / reset buzzer trigger
         if (data.stop_sounds_at && data.stop_sounds_at !== lastSoundTimestamps.current.stop) {
           lastSoundTimestamps.current.stop = data.stop_sounds_at;
           stopAudio(intenseAudioRef.current);
           stopAudio(winningRoundAudioRef.current);
           activeEffectAudioRef.current = null;
           playThemeSong();
+          if (onResetBuzzer) {
+            onResetBuzzer();
+          }
+          forceCleanupCelebration();
         }
       } catch (error) {
         console.error('Error polling sound triggers:', error);
@@ -627,12 +643,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
     <div className="w-screen h-screen fixed inset-0 overflow-hidden bg-gradient-to-b from-blue-800 via-blue-900 to-blue-950 flex items-center justify-center">
       {/* College Logo Lock-In Overlay Modal on top of the game board with visual effects & fitting emojis */}
       {(buzzWinnerIndex !== null && buzzWinnerIndex !== undefined && buzzWinnerIndex >= 0 && buzzWinnerIndex <= 4) && (() => {
-        const theme = COLLEGE_THEMES[buzzWinnerIndex] || COLLEGE_THEMES[0];
         const collegeName = getTeamNameByIndex(buzzWinnerIndex);
+        const theme = getCollegeTheme(collegeName, buzzWinnerIndex);
         const teamLogo = getTeamLogo(collegeName, buzzWinnerIndex);
 
         return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300 animate-pop-in overflow-hidden">
+          <div 
+            onClick={() => onResetBuzzer?.()}
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300 animate-pop-in overflow-hidden cursor-pointer"
+            title="Click to reset/dismiss buzzer"
+          >
             
             {/* Spinning Conic Ray / Light Beams Effect */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">

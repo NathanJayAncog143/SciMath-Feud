@@ -116,6 +116,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
   // Fix timeout type for browser builds
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastStrikeAnimationRef = useRef<string | null>(null);
+  const lastStopSoundsRef = useRef<string | null>(null);
 
   // Auto-reset buzzer when any team reaches 3 strikes (but allow steal attempts to complete)
   useEffect(() => {
@@ -313,6 +314,13 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
             });
         }
 
+        // Check for stop sounds / host buzzer reset trigger
+        if (gameData.stop_sounds_at && gameData.stop_sounds_at !== lastStopSoundsRef.current) {
+          lastStopSoundsRef.current = gameData.stop_sounds_at;
+          console.log('Host buzzer reset signal received');
+          resetBuzz();
+        }
+
         // If game status changed to playing and we're not already started, start the game
         if (newStatus === 'playing' && !gameState.gameStarted) {
           setError(null); // Clear any waiting error message
@@ -343,7 +351,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
     };
 
     pollGameData();
-    const interval = setInterval(pollGameData, 2000);
+    const interval = setInterval(pollGameData, 500);
     return () => {
       clearInterval(interval);
       if (animationTimeoutRef.current) {
