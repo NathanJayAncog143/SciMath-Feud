@@ -227,58 +227,22 @@ const HostControl: React.FC<HostControlProps> = ({
             </div>
           )}
 
-          {/* Buzzer Controls Panel */}
+          {/* Reset Buzzer Button */}
           <div className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-white/20">
-            <div className="text-white text-xs font-bold mb-3 text-center">BUZZER CONTROLS</div>
-            <div className="flex flex-col gap-2">
-              {/* Connect/Disconnect */}
-              <button
-                onClick={arduinoConnected ? onDisconnectBuzzer : onConnectBuzzer}
-                disabled={buzzerConnecting}
-                className={`px-3 py-2 rounded-md text-xs font-semibold shadow-md transition-all duration-200 transform hover:scale-105 ${
-                  arduinoConnected
-                    ? 'bg-gradient-to-br from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white'
-                    : buzzerConnecting
-                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-70'
-                    : 'bg-gradient-to-br from-indigo-600 to-indigo-800 hover:from-indigo-500 hover:to-indigo-700 text-white'
-                }`}
-                title={arduinoConnected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
-              >
-                {buzzerConnecting ? 'Connecting...' : arduinoConnected ? '🔌 Disconnect' : '🎮 Connect'}
-              </button>
-
-              {/* Reset Buzz */}
-              {arduinoConnected && (
-                <button
-                  onClick={onResetBuzzer}
-                  disabled={!onResetBuzzer}
-                  className="px-3 py-2 bg-gradient-to-br from-yellow-500 to-yellow-700 hover:from-yellow-400 hover:to-yellow-600 text-black rounded-md text-xs font-semibold shadow-md transition-all duration-200 transform hover:scale-105"
-                  title="Reset Buzzers"
-                >
-                  🔄 Reset Buzz
-                </button>
-              )}
-
-              {/* Button state dots */}
-              {arduinoConnected && buzzerButtonStates.length > 0 && (
-                <div className="flex items-center justify-center gap-1 mt-1">
-                  {buzzerButtonStates.map((b, i) => (
-                    <div
-                      key={i}
-                      className={`w-4 h-4 rounded-full border border-white/30 transition-all ${
-                        b ? 'bg-yellow-300 animate-pulse shadow-[0_0_6px_rgba(253,224,71,0.9)]' : 'bg-gray-600'
-                      }`}
-                      title={`Team ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Error message */}
-              {buzzerError && (
-                <div className="text-red-300 text-[10px] max-w-[120px] leading-tight">{buzzerError}</div>
-              )}
-            </div>
+            <div className="text-white text-xs font-bold mb-3 text-center">RESET BUZZER</div>
+            <button
+              onClick={onResetBuzzer}
+              disabled={!onResetBuzzer}
+              className={`px-4 py-3 rounded-lg flex flex-col items-center justify-center transition-all duration-200 transform shadow-lg min-w-[80px] ${
+                onResetBuzzer
+                  ? 'bg-gradient-to-br from-yellow-500 to-yellow-700 hover:from-yellow-400 hover:to-yellow-600 text-black hover:scale-105 cursor-pointer'
+                  : 'bg-gray-600 text-gray-400 opacity-50 cursor-not-allowed'
+              }`}
+              title="Reset Buzzers"
+            >
+              <span className="text-lg mb-1">🔄</span>
+              <span className="text-xs font-bold">RESET</span>
+            </button>
           </div>
         </div>
 
