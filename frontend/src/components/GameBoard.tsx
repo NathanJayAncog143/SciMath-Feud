@@ -765,14 +765,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
         );
       })()}
 
-      {/* Current Question */}
-      {question && (
-        <div className="absolute top-3 left-[48%] -translate-x-1/2 z-40 max-w-[80vw] sm:max-w-2xl px-4 sm:px-6 py-2 sm:py-3 rounded-xl bg-blue-950/80 border-2 border-yellow-400 shadow-xl text-center">
-          <span className="text-white font-bold text-sm sm:text-base lg:text-lg">
-            {question}
-          </span>
-        </div>
-      )}
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute inset-0 bg-gradient-radial from-blue-600/20 to-transparent"></div>
@@ -796,7 +788,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
       <div className="relative z-10 w-full h-full flex flex-col px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-6">
         {/* Main area */}
         <div className="flex-1 flex flex-col items-center justify-center min-h-0 max-h-full p-2 sm:p-4">
-          {/* Top row: Teams 1&3 left, 2&4 right */}
+          {/* Top row: Teams 1&3 left, centered question/answers, 2&4 right */}
           <div className="w-full max-w-7xl flex justify-between items-center mb-4 sm:mb-6">
             {/* Left: Team 1 & 3 */}
             <div className="flex flex-col gap-3 sm:gap-4">
@@ -874,8 +866,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
             </div>
 
             {/* Answer board */}
-            <div className="flex-1 max-w-2xl lg:max-w-3xl mx-6 sm:mx-8 lg:mx-10 ml-20 sm:ml-28 lg:ml-36">
-              <div className="relative bg-gradient-to-br from-blue-700 to-blue-800 rounded-full border-4 sm:border-6 lg:border-8 border-yellow-400 shadow-2xl p-4 sm:p-6 lg:p-8" style={{ aspectRatio: '4/3', maxHeight: '55vh' }}>
+            <div className="flex-1 max-w-2xl lg:max-w-3xl mx-6 sm:mx-8 lg:mx-10 flex flex-col items-center justify-center">
+              {question && (
+                <div className="z-40 mb-3 w-full max-w-2xl px-4 sm:px-6 py-2 sm:py-3 rounded-xl bg-blue-950/80 border-2 border-yellow-400 shadow-xl text-center">
+                  <span className="text-white font-bold text-sm sm:text-base lg:text-lg">
+                    {question}
+                  </span>
+                </div>
+              )}
+              <div className="relative w-full bg-gradient-to-br from-blue-700 to-blue-800 rounded-full border-4 sm:border-6 lg:border-8 border-yellow-400 shadow-2xl p-4 sm:p-6 lg:p-8" style={{ aspectRatio: '4/3', maxHeight: '55vh' }}>
                 <div className="absolute inset-3 sm:inset-4 lg:inset-6 border-2 sm:border-3 lg:border-4 border-dotted border-yellow-300 rounded-full"></div>
                 <div className="relative z-10 h-full flex flex-col justify-center">
                   <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full">
