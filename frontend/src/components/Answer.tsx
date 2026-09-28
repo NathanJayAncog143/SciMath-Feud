@@ -1,10 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import cteLogo from '../assets/cte_logo.png';
+import ctechLogo from '../assets/ctech_logo.jpg';
+import coasLogo from '../assets/coas_logo.jpg';
+import cbmLogo from '../assets/cbm_logo.jpg';
+import cfesLogo from '../assets/cfes_logo.jpg';
+
+const TEAM_LOGOS = [cteLogo, ctechLogo, coasLogo, cbmLogo, cfesLogo];
+
+const getTeamLogo = (teamName: string | undefined, teamIndex: number) => {
+  const name = teamName?.toUpperCase().trim() || '';
+  if (name.includes('CTECH') || name.includes('TECHNOLOGY')) return ctechLogo;
+  if (name.includes('CTE') || name.includes('TEACHER')) return cteLogo;
+  if (name.includes('COAS') || name.includes('AGRICULTUR')) return coasLogo;
+  if (name.includes('CBM') || name.includes('BUSINESS') || name.includes('MANAGEMENT')) return cbmLogo;
+  if (name.includes('CFES') || name.includes('FORESTRY') || name.includes('ENVIRONMENT')) return cfesLogo;
+  return TEAM_LOGOS[teamIndex] || cteLogo;
+};
 
 interface Answer {
   id: string;
   text: string;
   points: number;
   revealed: boolean;
+  revealedByTeam?: number;
 }
 interface HostControlProps {
   currentQuestionIndex: number;
@@ -51,13 +69,17 @@ interface HostControlProps {
   buzzerConnecting?: boolean;
   buzzerButtonStates?: boolean[];
   buzzerError?: string | null;
+  buzzerLockedTeam?: number | null;
 }
 const HostControl: React.FC<HostControlProps> = ({
-  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds, onResetBuzzer, arduinoConnected = false, onConnectBuzzer, onDisconnectBuzzer, buzzerConnecting = false, buzzerButtonStates = [], buzzerError = null
+  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds, onResetBuzzer, arduinoConnected = false, onConnectBuzzer, onDisconnectBuzzer, buzzerConnecting = false, buzzerButtonStates = [], buzzerError = null, buzzerLockedTeam = null
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<number>(1);
+  const [lockedTeam, setLockedTeam] = useState<number | null>(null);
   const [customScore, setCustomScore] = useState<string>('');
   const [showCustomScorePanel, setShowCustomScorePanel] = useState<boolean>(false);
+  const previousBuzzerStatesRef = useRef<boolean[]>(Array(5).fill(false));
+  const lockedTeamRef = useRef<number | null>(null);
 
   const teams = [
     { id: 1, name: team1Name, score: team1Score, strikes: team1Strikes },
@@ -66,6 +88,65 @@ const HostControl: React.FC<HostControlProps> = ({
     { id: 4, name: team4Name, score: team4Score, strikes: team4Strikes },
     { id: 5, name: team5Name, score: team5Score, strikes: team5Strikes }
   ];
+
+  // The first physical buzzer press locks and selects the team used by both
+  // answer awards and strikes. Further presses are ignored until reset.
+  useEffect(() => {
+    if (!arduinoConnected) {
+      previousBuzzerStatesRef.current = Array(5).fill(false);
+      lockedTeamRef.current = null;
+      setLockedTeam(null);
+      return;
+    }
+
+    const previous = previousBuzzerStatesRef.current;
+    if (lockedTeamRef.current === null) {
+      for (let index = 0; index < buzzerButtonStates.length && index < 5; index += 1) {
+        if (!previous[index] && buzzerButtonStates[index]) {
+          const teamId = index + 1;
+          lockedTeamRef.current = teamId;
+          setLockedTeam(teamId);
+          setSelectedTeam(teamId);
+          break;
+        }
+      }
+    }
+    previousBuzzerStatesRef.current = [...buzzerButtonStates];
+  }, [arduinoConnected, buzzerButtonStates]);
+
+  // A new question starts a fresh buzzer round.
+  useEffect(() => {
+    lockedTeamRef.current = null;
+    setLockedTeam(null);
+    previousBuzzerStatesRef.current = Array(5).fill(false);
+  }, [currentQuestionIndex]);
+
+  // Locks published by the game-board screen take priority over manual selection.
+  useEffect(() => {
+    if (buzzerLockedTeam !== null && buzzerLockedTeam >= 1 && buzzerLockedTeam <= 5) {
+      lockedTeamRef.current = buzzerLockedTeam;
+      setLockedTeam(buzzerLockedTeam);
+      setSelectedTeam(buzzerLockedTeam);
+    } else {
+      lockedTeamRef.current = null;
+      setLockedTeam(null);
+    }
+  }, [buzzerLockedTeam]);
+
+  const handleResetBuzzer = () => {
+    lockedTeamRef.current = null;
+    setLockedTeam(null);
+    previousBuzzerStatesRef.current = Array(5).fill(false);
+    onResetBuzzer?.();
+  };
+
+  const handleNextQuestion = () => {
+    lockedTeamRef.current = null;
+    setLockedTeam(null);
+    previousBuzzerStatesRef.current = Array(5).fill(false);
+    onResetBuzzer?.();
+    onNextQuestion();
+  };
 
   const handleAnswerClick = (answerIndex: number) => {
     onRevealAnswer(answerIndex, selectedTeam);
@@ -227,11 +308,49 @@ const HostControl: React.FC<HostControlProps> = ({
             </div>
           )}
 
+          {/* USB buzzer connection and live button status */}
+          {(onConnectBuzzer || onDisconnectBuzzer) && (
+            <div className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-white/20 min-w-[150px]">
+              <div className="text-white text-xs font-bold mb-3 text-center">USB BUZZERS</div>
+              <button
+                onClick={arduinoConnected ? onDisconnectBuzzer : onConnectBuzzer}
+                disabled={buzzerConnecting || (!arduinoConnected && !onConnectBuzzer)}
+                className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  arduinoConnected
+                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                    : buzzerConnecting
+                      ? 'bg-amber-600 text-white cursor-wait'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                }`}
+              >
+                {buzzerConnecting ? 'RECONNECTING...' : arduinoConnected ? 'DISCONNECT' : 'CONNECT'}
+              </button>
+              <div className="mt-2 flex justify-center gap-1" aria-label="Live buzzer button states">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <span
+                    key={index}
+                    title={`Buzzer ${index + 1}`}
+                    className={`w-3 h-3 rounded-full ${
+                      arduinoConnected && buzzerButtonStates[index]
+                        ? 'bg-yellow-300 animate-pulse'
+                        : arduinoConnected ? 'bg-green-900' : 'bg-gray-600'
+                    }`}
+                  />
+                ))}
+              </div>
+              {buzzerError && (
+                <div className="mt-2 max-w-[180px] text-[10px] leading-tight text-red-200" role="status">
+                  {buzzerError}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Reset Buzzer Button */}
           <div className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-white/20">
             <div className="text-white text-xs font-bold mb-3 text-center">RESET BUZZER</div>
             <button
-              onClick={onResetBuzzer}
+              onClick={handleResetBuzzer}
               disabled={!onResetBuzzer}
               className={`px-4 py-3 rounded-lg flex flex-col items-center justify-center transition-all duration-200 transform shadow-lg min-w-[80px] ${
                 onResetBuzzer
@@ -343,24 +462,26 @@ const HostControl: React.FC<HostControlProps> = ({
       {/* Main Control Panel */}
       <div className="max-w-6xl mx-auto">
 
-        {/* Question Display */}
-        <div className="bg-black/30 backdrop-blur-md rounded-xl p-6 mb-8 border border-white/20">
-          <div className="text-center">
-            <div className="text-white/80 text-lg mb-2">Question {currentQuestionIndex + 1} of {totalQuestions}</div>
-          </div>
-        </div>
-
-        {/* Team Selection */}
-        <div className="bg-black/30 backdrop-blur-md rounded-xl p-6 mb-8 border border-white/20">
+        {/* Unified team, strike, question, and answer controls */}
+        <div className="bg-black/30 backdrop-blur-md rounded-xl mb-8 border border-white/20 overflow-hidden shadow-2xl">
+        <section className="p-6">
           <div className="text-white text-xl font-bold mb-4 text-center">Select Team to Award Points</div>
+          {lockedTeam !== null && (
+            <div className="mb-4 text-center text-sm font-bold text-yellow-300" role="status">
+              Buzzer locked: {teams.find(team => team.id === lockedTeam)?.name}
+            </div>
+          )}
           <div className="flex justify-center gap-3 flex-wrap">
             {teams.map(team => (
               <button
                 key={team.id}
                 onClick={() => setSelectedTeam(team.id)}
+                disabled={lockedTeam !== null && lockedTeam !== team.id}
                 className={`px-6 py-4 rounded-lg font-bold border-2 transition-all duration-200 min-w-[180px] ${selectedTeam === team.id
                     ? 'bg-yellow-400 text-blue-900 border-yellow-500 shadow-lg scale-105'
-                    : 'bg-blue-700/50 text-white border-blue-500/50 hover:bg-blue-600/70 hover:border-blue-400'}`}
+                    : 'bg-blue-700/50 text-white border-blue-500/50 hover:bg-blue-600/70 hover:border-blue-400'} ${
+                      lockedTeam !== null && lockedTeam !== team.id ? 'opacity-45 cursor-not-allowed' : ''
+                    }`}
               >
                 <div className="text-lg">{team.name}</div>
                 <div className="text-sm opacity-80">{team.score} points</div>
@@ -378,25 +499,21 @@ const HostControl: React.FC<HostControlProps> = ({
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* Strike Control */}
-        <div className="bg-black/30 backdrop-blur-md rounded-xl p-6 mb-8 border border-white/20">
-          <div className="text-white text-xl font-bold mb-4 text-center">
-            Add Strike to <span className="text-red-400">{teams.find(t => t.id === selectedTeam)?.name}</span>
-          </div>
-          <div className="flex justify-center">
-            <button
-              onClick={() => onAddStrike(selectedTeam)}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg transition-colors text-lg flex items-center gap-2"
-            >
-              🚫 ADD STRIKE
-            </button>
-          </div>
-        </div>
+        {/* Question and strike controls */}
+        <section className="relative border-t border-white/20 px-6 pt-6 flex items-center justify-center min-h-[78px]">
+          <div className="text-white/80 text-lg">Question {currentQuestionIndex + 1} of {totalQuestions}</div>
+          <button
+            onClick={() => onAddStrike(selectedTeam)}
+            className="absolute right-6 top-4 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-5 rounded-lg transition-colors text-sm shadow-lg"
+          >
+            ADD STRIKE: {teams.find(team => team.id === selectedTeam)?.name}
+          </button>
+        </section>
 
         {/* Answer Board */}
-        <div className="bg-black/30 backdrop-blur-md rounded-xl p-6 mb-8 border border-white/20">
+        <section className="p-6">
           <div className="text-white text-xl font-bold mb-4 text-center">
             Click Answer to Award to <span className="text-yellow-400">{teams.find(t => t.id === selectedTeam)?.name}</span>
           </div>
@@ -423,9 +540,17 @@ const HostControl: React.FC<HostControlProps> = ({
                       {answer.text ? answer.points : '—'}
                     </span>
                     {answer.revealed && (
-                      <span className="ml-2 text-green-300 text-sm font-bold shrink-0">
-                        ✓ REVEALED
-                      </span>
+                      <div className="ml-2 flex items-center gap-2 shrink-0">
+                        {answer.revealedByTeam && answer.revealedByTeam >= 1 && answer.revealedByTeam <= 5 && (
+                          <img
+                            src={getTeamLogo(teams[answer.revealedByTeam - 1]?.name, answer.revealedByTeam - 1)}
+                            alt={`${teams[answer.revealedByTeam - 1]?.name} logo`}
+                            title={`Answered by ${teams[answer.revealedByTeam - 1]?.name}`}
+                            className="w-9 h-9 rounded-full object-cover bg-white border-2 border-yellow-300 shadow-md"
+                          />
+                        )}
+                        <span className="text-green-200 text-sm font-bold">✓ REVEALED</span>
+                      </div>
                     )}
                   </div>
                   
@@ -470,9 +595,17 @@ const HostControl: React.FC<HostControlProps> = ({
                       {answer.text ? answer.points : '—'}
                     </span>
                     {answer.revealed && (
-                      <span className="ml-2 text-green-300 text-sm font-bold shrink-0">
-                        ✓ REVEALED
-                      </span>
+                      <div className="ml-2 flex items-center gap-2 shrink-0">
+                        {answer.revealedByTeam && answer.revealedByTeam >= 1 && answer.revealedByTeam <= 5 && (
+                          <img
+                            src={getTeamLogo(teams[answer.revealedByTeam - 1]?.name, answer.revealedByTeam - 1)}
+                            alt={`${teams[answer.revealedByTeam - 1]?.name} logo`}
+                            title={`Answered by ${teams[answer.revealedByTeam - 1]?.name}`}
+                            className="w-9 h-9 rounded-full object-cover bg-white border-2 border-yellow-300 shadow-md"
+                          />
+                        )}
+                        <span className="text-green-200 text-sm font-bold">✓ REVEALED</span>
+                      </div>
                     )}
                   </div>
                   
@@ -497,6 +630,7 @@ const HostControl: React.FC<HostControlProps> = ({
               ))}
             </div>
           </div>
+        </section>
         </div>
 
         {/* Game Controls */}
@@ -522,7 +656,7 @@ const HostControl: React.FC<HostControlProps> = ({
             <div className="text-white text-lg font-bold mb-4 text-center">Controls</div>
             <div className="space-y-3">
               <button
-                onClick={onNextQuestion}
+                onClick={handleNextQuestion}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors"
               >
                 ➡️ NEXT QUESTION

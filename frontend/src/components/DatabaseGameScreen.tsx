@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import GameBoard from './GameBoard';
-import { getGameSetByCode, getRevealedAnswers, supabase } from '../lib/supabase';
+import { getGameSetByCode, getRevealedAnswerDetails, setGameBuzzerWinner, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
 import { useArduino } from '../hooks/useArduino';
 import correctAnswerSound from '../assets/reveal.mp3';
@@ -46,13 +46,14 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
     team5: 0,
   });
   const [revealedAnswerIds, setRevealedAnswerIds] = useState<string[]>([]);
+  const [revealedAnswersByTeam, setRevealedAnswersByTeam] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hostGameStatus, setHostGameStatus] = useState<'waiting' | 'playing' | 'paused' | 'finished'>('waiting');
   const [buzzerControlsExpanded, setBuzzerControlsExpanded] = useState(false);
   
   // Host gating temporarily disabled
-  const { connected, connecting, error: arduinoError, buttonStates, lastPressedIndex, connect, disconnect, clearLog, resetBuzzer } = useArduino({ baudRate: 9600, numButtons: 5 });
+  const { connected, connecting, reconnecting, error: arduinoError, buttonStates, lastPressedIndex, connect, disconnect, clearLog, resetBuzzer } = useArduino({ baudRate: 9600, numButtons: 5, autoReconnect: true });
   const [buzzWinnerIndex, setBuzzWinnerIndex] = useState<number | null>(null);
   const lastButtonSnapshot = useRef<boolean[]>([false, false, false, false, false]);
 
@@ -106,6 +107,12 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
       }
     }
   }, [buzzWinnerIndex]);
+
+  // Publish the physical buzzer winner so Host Control selects the same team.
+  useEffect(() => {
+    if (!game?.id) return;
+    void setGameBuzzerWinner(game.id, buzzWinnerIndex === null ? null : buzzWinnerIndex + 1);
+  }, [buzzWinnerIndex, game?.id]);
 
   const resetBuzz = useCallback(() => {
     resetBuzzer();
@@ -328,7 +335,8 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
 
         // Fetch revealed answers for current question
         if (newStatus === 'playing') {
-          const revealedAnswers = await getRevealedAnswers(game.id);
+          const revealedAnswerDetails = await getRevealedAnswerDetails(game.id);
+          const revealedAnswers = revealedAnswerDetails.map(answer => answer.answer_id);
           
           // Check if new answers were revealed
           const previouslyRevealed = prevRevealedAnswersRef.current;
@@ -343,6 +351,9 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
           // Update the refs and state
           prevRevealedAnswersRef.current = revealedAnswers;
           setRevealedAnswerIds(revealedAnswers);
+          setRevealedAnswersByTeam(Object.fromEntries(
+            revealedAnswerDetails.map(answer => [answer.answer_id, answer.revealed_by_team])
+          ));
         }
 
       } catch (error) {
@@ -607,7 +618,8 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
   const currentQuestion = gameSet.questions[safeQuestionIndex];
   const answersWithRevealState = currentQuestion.answers.map(answer => ({
     ...answer,
-    revealed: revealedAnswerIds.includes(answer.id)
+    revealed: revealedAnswerIds.includes(answer.id),
+    revealedByTeam: revealedAnswersByTeam[answer.id] || 0
   }));
 
   return (
@@ -647,7 +659,7 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
                 className={`px-4 py-2 rounded-md text-sm font-semibold shadow-md transition-colors ${connected ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
                 disabled={connecting}
               >
-                {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
+                {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : reconnecting ? 'Reconnect Manually' : 'Connect Buzzers'}
               </button>
 
               {connected && (

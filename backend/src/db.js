@@ -217,8 +217,11 @@ export async function revealAnswer(gameId, answerId, revealedByTeam) {
 }
 
 export async function getRevealedAnswers(gameId) {
-  const [resultSets] = await pool.query('CALL sp_get_revealed_answers(?)', [gameId]);
-  return rowsFromCall(resultSets).map((row) => row.answer_id);
+  const [rows] = await pool.query(
+    'SELECT answer_id, revealed_by_team, revealed_at FROM sf_game_answers WHERE game_id = ? ORDER BY revealed_at ASC',
+    [gameId]
+  );
+  return rows;
 }
 
 export async function saveGameSet(gameSet) {

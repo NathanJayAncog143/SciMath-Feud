@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import HostControl from './Answer';
-import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, triggerGameSound, supabase } from '../lib/supabase';
+import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, triggerGameSound, getGameBuzzerState, setGameBuzzerWinner, getRevealedAnswerDetails, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
 import { useArduino } from '../hooks/useArduino';
 
@@ -23,6 +23,8 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     gameStarted: false
   });
   const [revealedAnswerIds, setRevealedAnswerIds] = useState<string[]>([]);
+  const [revealedAnswersByTeam, setRevealedAnswersByTeam] = useState<Record<string, number>>({});
+  const [buzzerLockedTeam, setBuzzerLockedTeam] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gameStatus, setGameStatus] = useState<'waiting' | 'playing' | 'paused' | 'finished'>('waiting');
@@ -52,17 +54,70 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
   const {
     connected: arduinoConnected,
     connecting: arduinoConnecting,
+    reconnecting: arduinoReconnecting,
     error: arduinoError,
     buttonStates: arduinoButtonStates,
     connect: connectArduino,
     disconnect: disconnectArduino,
     resetBuzzer: resetArduinoBuzzer,
-  } = useArduino({ baudRate: 9600, numButtons: 5 });
+  } = useArduino({ baudRate: 9600, numButtons: 5, autoReconnect: true });
+  const previousArduinoButtonsRef = useRef<boolean[]>(Array(5).fill(false));
+
+  // Keep Host Control synchronized with the game-board buzzer and answer owners.
+  useEffect(() => {
+    const gameId = game?.id;
+    if (!gameId) return;
+    let active = true;
+
+    const pollSharedControlState = async () => {
+      const [buzzer, revealedAnswers] = await Promise.all([
+        getGameBuzzerState(gameId),
+        getRevealedAnswerDetails(gameId),
+      ]);
+      if (!active) return;
+      setBuzzerLockedTeam(buzzer.teamId);
+      setRevealedAnswerIds(revealedAnswers.map(answer => answer.answer_id));
+      setRevealedAnswersByTeam(Object.fromEntries(
+        revealedAnswers.map(answer => [answer.answer_id, answer.revealed_by_team])
+      ));
+    };
+
+    void pollSharedControlState();
+    const interval = setInterval(() => { void pollSharedControlState(); }, 300);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [game?.id]);
+
+  // If the Arduino is connected to Host Control, publish its first press too.
+  useEffect(() => {
+    if (!arduinoConnected) {
+      previousArduinoButtonsRef.current = Array(5).fill(false);
+      return;
+    }
+
+    const previous = previousArduinoButtonsRef.current;
+    if (buzzerLockedTeam === null && game?.id) {
+      for (let index = 0; index < arduinoButtonStates.length && index < 5; index += 1) {
+        if (!previous[index] && arduinoButtonStates[index]) {
+          const teamId = index + 1;
+          setBuzzerLockedTeam(teamId);
+          void setGameBuzzerWinner(game.id, teamId);
+          break;
+        }
+      }
+    }
+    previousArduinoButtonsRef.current = [...arduinoButtonStates];
+  }, [arduinoButtonStates, arduinoConnected, buzzerLockedTeam, game?.id]);
 
   const handleResetBuzzer = async () => {
     resetArduinoBuzzer();
+    previousArduinoButtonsRef.current = Array(5).fill(false);
+    setBuzzerLockedTeam(null);
     if (game?.id) {
       try {
+        await setGameBuzzerWinner(game.id, null);
         await triggerGameSound(game.id, 'stop');
         console.log('Buzzer reset signal broadcast to game board');
       } catch (error) {
@@ -347,6 +402,7 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
       if (success) {
         // Update local state
         setRevealedAnswerIds(prev => [...prev, answer.id]);
+        setRevealedAnswersByTeam(prev => ({ ...prev, [answer.id]: teamIndex }));
 
         // Calculate new scores
         const newScores = [
@@ -404,6 +460,7 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
       if (success) {
         // Update local state - just reveal the answer without changing scores
         setRevealedAnswerIds(prev => [...prev, answer.id]);
+        setRevealedAnswersByTeam(prev => ({ ...prev, [answer.id]: 0 }));
       }
     } catch (error) {
       console.error('Failed to reveal answer without points:', error);
@@ -445,7 +502,22 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
             team4Strikes: 0,
             team5Strikes: 0
           }));
+          // The strike indicators are rendered from the game record, so reset
+          // that local copy immediately instead of waiting for another fetch.
+          setGame(prev => prev ? ({
+            ...prev,
+            current_question_index: nextIndex,
+            strikes: 0,
+            team1_strikes: 0,
+            team2_strikes: 0,
+            team3_strikes: 0,
+            team4_strikes: 0,
+            team5_strikes: 0,
+          }) : prev);
+          setHasStrikeUndo(false);
+          setPreviousStrikes(null);
           setRevealedAnswerIds([]); // Reset revealed answers for new question
+          setRevealedAnswersByTeam({});
         }
       } catch (error) {
         console.error('Failed to advance to next question:', error);
@@ -725,7 +797,8 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
   const currentQuestion = gameSet.questions[gameState.currentQuestionIndex];
   const answersWithRevealState = currentQuestion.answers.map(answer => ({
     ...answer,
-    revealed: revealedAnswerIds.includes(answer.id)
+    revealed: revealedAnswerIds.includes(answer.id),
+    revealedByTeam: revealedAnswersByTeam[answer.id] || 0
   }));
 
   return (
@@ -770,9 +843,10 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
       arduinoConnected={arduinoConnected}
       onConnectBuzzer={connectArduino}
       onDisconnectBuzzer={disconnectArduino}
-      buzzerConnecting={arduinoConnecting}
+      buzzerConnecting={arduinoConnecting || arduinoReconnecting}
       buzzerButtonStates={arduinoButtonStates}
       buzzerError={arduinoError}
+      buzzerLockedTeam={buzzerLockedTeam}
     />
   );
 };

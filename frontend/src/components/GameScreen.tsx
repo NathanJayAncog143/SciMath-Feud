@@ -48,7 +48,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
     team5: 0,
   });
   
-  const { connected, connecting, error: arduinoError, buttonStates, lastPressedIndex, connect, disconnect, resetBuzzer } = useArduino({ baudRate: 9600, numButtons: 5 });
+  const { connected, connecting, reconnecting, error: arduinoError, buttonStates, lastPressedIndex, connect, disconnect, resetBuzzer } = useArduino({ baudRate: 9600, numButtons: 5, autoReconnect: true });
   const [buzzWinnerIndex, setBuzzWinnerIndex] = useState<number | null>(null);
   const lastButtonSnapshot = useRef<boolean[]>([false, false, false, false, false]);
   const playerPressAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -309,7 +309,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBackToWelcome, gameData }) =>
           className={`px-4 py-2 rounded-md text-sm font-semibold shadow-md transition-colors ${connected ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
           disabled={connecting}
         >
-          {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : 'Connect Buzzers'}
+          {connecting ? 'Connecting...' : connected ? 'Disconnect Buzzers' : reconnecting ? 'Reconnect Manually' : 'Connect Buzzers'}
         </button>
         {arduinoError && (
           <div className="text-xs text-red-300 max-w-[160px]">{arduinoError}</div>

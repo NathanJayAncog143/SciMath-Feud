@@ -291,6 +291,17 @@ export interface GameState {
   gameStarted: boolean;
 }
 
+export interface RevealedAnswerState {
+  answer_id: string;
+  revealed_by_team: number;
+  revealed_at?: string;
+}
+
+export interface GameBuzzerState {
+  teamId: number | null;
+  lockedAt: string | null;
+}
+
 export interface GameSetQuestion {
   id?: string;
   question: string;
@@ -446,6 +457,29 @@ export const triggerGameSound = async (gameId: string, sound: 'intense' | 'winni
   }
 };
 
+export const setGameBuzzerWinner = async (gameId: string, teamId: number | null): Promise<GameBuzzerState | null> => {
+  try {
+    const response = await request<{ buzzer: GameBuzzerState }>(`/api/games/${encodeURIComponent(gameId)}/buzzer`, {
+      method: 'POST',
+      body: JSON.stringify({ teamId })
+    });
+    return response.buzzer;
+  } catch (error) {
+    console.error('Error updating buzzer winner:', error);
+    return null;
+  }
+};
+
+export const getGameBuzzerState = async (gameId: string): Promise<GameBuzzerState> => {
+  try {
+    const response = await request<{ buzzer: GameBuzzerState }>(`/api/games/${encodeURIComponent(gameId)}/buzzer`);
+    return response.buzzer;
+  } catch (error) {
+    console.error('Error fetching buzzer state:', error);
+    return { teamId: null, lockedAt: null };
+  }
+};
+
 export const revealAnswerInGame = async (gameId: string, answerId: string, revealedByTeam: number): Promise<boolean> => {
   try {
     await request('/api/game-answers', {
@@ -469,6 +503,16 @@ export const getRevealedAnswers = async (gameId: string): Promise<string[]> => {
     return response.answerIds;
   } catch (error) {
     console.error('Error fetching revealed answers:', error);
+    return [];
+  }
+};
+
+export const getRevealedAnswerDetails = async (gameId: string): Promise<RevealedAnswerState[]> => {
+  try {
+    const response = await request<{ revealedAnswers: RevealedAnswerState[] }>(`/api/games/${encodeURIComponent(gameId)}/revealed-answers`);
+    return response.revealedAnswers || [];
+  } catch (error) {
+    console.error('Error fetching revealed answer details:', error);
     return [];
   }
 };

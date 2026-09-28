@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import welcomeImage from '../assets/1758200122303.jpg';
+import welcomeImage from '../assets/welcome-screen.jpg';
 import themeSong from '../assets/Family Feud Theme Song (Harvey era).mp3';
 
 interface WelcomeScreenProps {

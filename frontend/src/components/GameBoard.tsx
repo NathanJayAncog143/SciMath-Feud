@@ -117,6 +117,7 @@ interface GameBoardProps {
     text: string;
     points: number;
     revealed: boolean;
+    revealedByTeam?: number;
   }>;
   team1Score?: number;
   team2Score?: number;
@@ -276,11 +277,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
       setCelebratingTeam(buzzWinnerIndex);
       playHostSound(buzzerAudioRef.current, 'buzzer');
       
-      // Set cleanup timeout with proper reference tracking (full 3 seconds)
+      // Show the lock-in card for five seconds, then return to the board while
+      // keeping the winning team locked for Host Control.
       celebrationTimeoutRef.current = setTimeout(() => {
         setCelebratingTeam(null);
         celebrationTimeoutRef.current = null;
-      }, 3000);
+      }, 5000);
     }
     
     // Update previous state tracking
@@ -642,16 +644,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
   return (
     <div className="w-screen h-screen fixed inset-0 overflow-hidden bg-gradient-to-b from-blue-800 via-blue-900 to-blue-950 flex items-center justify-center">
       {/* College Logo Lock-In Overlay Modal on top of the game board with visual effects & fitting emojis */}
-      {(buzzWinnerIndex !== null && buzzWinnerIndex !== undefined && buzzWinnerIndex >= 0 && buzzWinnerIndex <= 4) && (() => {
-        const collegeName = getTeamNameByIndex(buzzWinnerIndex);
-        const theme = getCollegeTheme(collegeName, buzzWinnerIndex);
-        const teamLogo = getTeamLogo(collegeName, buzzWinnerIndex);
+      {(celebratingTeam !== null && celebratingTeam >= 0 && celebratingTeam <= 4) && (() => {
+        const collegeName = getTeamNameByIndex(celebratingTeam);
+        const theme = getCollegeTheme(collegeName, celebratingTeam);
+        const teamLogo = getTeamLogo(collegeName, celebratingTeam);
 
         return (
           <div 
-            onClick={() => onResetBuzzer?.()}
-            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300 animate-pop-in overflow-hidden cursor-pointer"
-            title="Click to reset/dismiss buzzer"
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/60 backdrop-blur-md transition-all duration-300 animate-pop-in overflow-hidden"
           >
             
             {/* Spinning Conic Ray / Light Beams Effect */}

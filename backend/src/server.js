@@ -20,6 +20,7 @@ import {
 assertConfig();
 
 const clients = new Set();
+const buzzerLocks = new Map();
 
 function corsHeaders(extra = {}) {
   return {
@@ -168,6 +169,9 @@ const server = createServer(async (req, res) => {
       if (req.method === 'PATCH') {
         const body = await readJsonBody(req);
         const game = await updateGame(gameId, body);
+        if (Object.prototype.hasOwnProperty.call(body, 'current_question_index')) {
+          buzzerLocks.delete(gameId);
+        }
         broadcast({ type: 'game-updated', game });
         sendJson(res, 200, { game, success: true });
         return;
@@ -183,10 +187,40 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const buzzerMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/buzzer$/);
+    if (buzzerMatch) {
+      const gameId = decodeURIComponent(buzzerMatch[1]);
+
+      if (req.method === 'GET') {
+        sendJson(res, 200, {
+          buzzer: buzzerLocks.get(gameId) || { teamId: null, lockedAt: null },
+          success: true
+        });
+        return;
+      }
+
+      if (req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const teamId = body.teamId === null ? null : Number(body.teamId);
+
+        if (teamId === null) {
+          buzzerLocks.delete(gameId);
+        } else if (Number.isInteger(teamId) && teamId >= 1 && teamId <= 5 && !buzzerLocks.has(gameId)) {
+          buzzerLocks.set(gameId, { teamId, lockedAt: new Date().toISOString() });
+        }
+
+        const buzzer = buzzerLocks.get(gameId) || { teamId: null, lockedAt: null };
+        broadcast({ type: 'buzzer-updated', gameId, buzzer });
+        sendJson(res, 200, { buzzer, success: true });
+        return;
+      }
+    }
+
     const soundMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/sounds$/);
     if (req.method === 'POST' && soundMatch) {
       const body = await readJsonBody(req);
       const game = await triggerGameSound(decodeURIComponent(soundMatch[1]), body.sound);
+      if (body.sound === 'stop') buzzerLocks.delete(decodeURIComponent(soundMatch[1]));
       broadcast({ type: 'game-updated', game, sound: body.sound });
       sendJson(res, 200, { game, success: true });
       return;
@@ -194,8 +228,12 @@ const server = createServer(async (req, res) => {
 
     const revealedMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/revealed-answers$/);
     if (req.method === 'GET' && revealedMatch) {
-      const answerIds = await getRevealedAnswers(decodeURIComponent(revealedMatch[1]));
-      sendJson(res, 200, { answerIds, success: true });
+      const revealedAnswers = await getRevealedAnswers(decodeURIComponent(revealedMatch[1]));
+      sendJson(res, 200, {
+        answerIds: revealedAnswers.map((answer) => answer.answer_id),
+        revealedAnswers,
+        success: true
+      });
       return;
     }
 
