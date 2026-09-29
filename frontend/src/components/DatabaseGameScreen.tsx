@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import GameBoard from './GameBoard';
-import { getGameSetByCode, getRevealedAnswerDetails, setGameBuzzerWinner, supabase } from '../lib/supabase';
+import { getGameSetByCode, getGameBuzzerState, getRevealedAnswerDetails, setGameBuzzerWinner, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
 import { useArduino } from '../hooks/useArduino';
 import correctAnswerSound from '../assets/reveal.mp3';
@@ -56,11 +56,11 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
   const { connected, connecting, reconnecting, error: arduinoError, buttonStates, lastPressedIndex, connect, disconnect, clearLog, resetBuzzer } = useArduino({ baudRate: 9600, numButtons: 5, autoReconnect: true });
   const [buzzWinnerIndex, setBuzzWinnerIndex] = useState<number | null>(null);
   const lastButtonSnapshot = useRef<boolean[]>([false, false, false, false, false]);
+  const buzzerClaimInFlightRef = useRef(false);
 
   // First-buzz lock-in detection with strike gating
   useEffect(() => {
     if (!connected) {
-      setBuzzWinnerIndex(null);
       lastButtonSnapshot.current = [false, false, false, false, false];
       return;
     }
@@ -86,13 +86,21 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
           continue;
         }
         
-        // Team is eligible, set as winner
-        setBuzzWinnerIndex(i);
+        // The API owns the first-press lock, so both screens resolve simultaneous
+        // presses to the same winner.
+        if (!buzzerClaimInFlightRef.current && game?.id) {
+          buzzerClaimInFlightRef.current = true;
+          void setGameBuzzerWinner(game.id, i + 1).then(buzzer => {
+            if (buzzer) setBuzzWinnerIndex(buzzer.teamId === null ? null : buzzer.teamId - 1);
+          }).finally(() => {
+            buzzerClaimInFlightRef.current = false;
+          });
+        }
         break;
       }
     }
     lastButtonSnapshot.current = [...buttonStates];
-  }, [buttonStates, connected, buzzWinnerIndex, teamStrikes]);
+  }, [buttonStates, connected, buzzWinnerIndex, teamStrikes, game?.id]);
 
   // Play buzzer sound when a team successfully presses their buzzer
   useEffect(() => {
@@ -108,17 +116,35 @@ const DatabaseGameScreen: React.FC<DatabaseGameScreenProps> = ({
     }
   }, [buzzWinnerIndex]);
 
-  // Publish the physical buzzer winner so Host Control selects the same team.
+  // Follow the shared lock so a buzzer connected on Host Control behaves exactly
+  // like one connected on this audience screen.
   useEffect(() => {
     if (!game?.id) return;
-    void setGameBuzzerWinner(game.id, buzzWinnerIndex === null ? null : buzzWinnerIndex + 1);
-  }, [buzzWinnerIndex, game?.id]);
+    let active = true;
+    let polling = false;
+
+    const pollBuzzer = async () => {
+      if (polling) return;
+      polling = true;
+      const buzzer = await getGameBuzzerState(game.id);
+      polling = false;
+      if (active) setBuzzWinnerIndex(buzzer.teamId === null ? null : buzzer.teamId - 1);
+    };
+
+    void pollBuzzer();
+    const interval = setInterval(() => { void pollBuzzer(); }, 300);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [game?.id]);
 
   const resetBuzz = useCallback(() => {
     resetBuzzer();
     setBuzzWinnerIndex(null);
     lastButtonSnapshot.current = [false, false, false, false, false];
-  }, [resetBuzzer]);
+    if (game?.id) void setGameBuzzerWinner(game.id, null);
+  }, [game?.id, resetBuzzer]);
   const [showStrikeAnimation, setShowStrikeAnimation] = useState(false);
   // Fix timeout type for browser builds
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

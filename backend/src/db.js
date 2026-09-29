@@ -13,6 +13,76 @@ const pool = mysql.createPool({
   multipleStatements: false
 });
 
+let gameEventsTablePromise;
+
+function ensureGameEventsTable() {
+  if (!gameEventsTablePromise) {
+    gameEventsTablePromise = pool.query(`
+      CREATE TABLE IF NOT EXISTS sf_game_events (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        game_id CHAR(36) NOT NULL,
+        event_type VARCHAR(40) NOT NULL,
+        team_id TINYINT UNSIGNED NULL,
+        points INT NULL,
+        details VARCHAR(255) NULL,
+        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (id),
+        KEY idx_game_events_game_created (game_id, created_at),
+        CONSTRAINT fk_game_events_game FOREIGN KEY (game_id)
+          REFERENCES sf_games (id) ON DELETE CASCADE ON UPDATE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `).catch((error) => {
+      gameEventsTablePromise = undefined;
+      throw error;
+    });
+  }
+  return gameEventsTablePromise;
+}
+
+export async function recordGameEvent(gameId, eventType, { teamId = null, points = null, details = null } = {}) {
+  await ensureGameEventsTable();
+  await pool.query(
+    'INSERT INTO sf_game_events (game_id, event_type, team_id, points, details) VALUES (?, ?, ?, ?, ?)',
+    [gameId, eventType, teamId, points, details]
+  );
+}
+
+export async function tryRecordGameEvent(gameId, eventType, event = {}) {
+  try {
+    await recordGameEvent(gameId, eventType, event);
+  } catch (error) {
+    console.error('Unable to record game history:', error);
+  }
+}
+
+export async function getGameEvents(gameId) {
+  await ensureGameEventsTable();
+  const [rows] = await pool.query(
+    `SELECT
+       e.id, e.game_id, e.event_type, e.team_id, e.points, e.details, e.created_at,
+       CASE e.team_id
+         WHEN 1 THEN COALESCE(g.team1_custom_name, t1.name, 'Team 1')
+         WHEN 2 THEN COALESCE(g.team2_custom_name, t2.name, 'Team 2')
+         WHEN 3 THEN COALESCE(g.team3_custom_name, t3.name, 'Team 3')
+         WHEN 4 THEN COALESCE(g.team4_custom_name, t4.name, 'Team 4')
+         WHEN 5 THEN COALESCE(g.team5_custom_name, t5.name, 'Team 5')
+         ELSE NULL
+       END AS team_name
+     FROM sf_game_events e
+     JOIN sf_games g ON g.id = e.game_id
+     LEFT JOIN sf_teams t1 ON t1.id = g.team1_id
+     LEFT JOIN sf_teams t2 ON t2.id = g.team2_id
+     LEFT JOIN sf_teams t3 ON t3.id = g.team3_id
+     LEFT JOIN sf_teams t4 ON t4.id = g.team4_id
+     LEFT JOIN sf_teams t5 ON t5.id = g.team5_id
+     WHERE e.game_id = ?
+     ORDER BY e.created_at DESC, e.id DESC
+     LIMIT 500`,
+    [gameId]
+  );
+  return rows;
+}
+
 function rowsFromCall(resultSets, index = 0) {
   return resultSets?.[index] || [];
 }
@@ -183,6 +253,16 @@ export async function updateGame(id, updates) {
     await pool.query('CALL sp_finish_game(?)', [id]);
   }
 
+  if (updates.current_question_index !== undefined
+    && Number(updates.current_question_index) !== Number(current.current_question_index)) {
+    await tryRecordGameEvent(id, 'question_changed', {
+      details: `Question ${Number(updates.current_question_index) + 1}`
+    });
+  }
+  if (updates.game_status && updates.game_status !== current.game_status) {
+    await tryRecordGameEvent(id, 'status_changed', { details: updates.game_status });
+  }
+
   return getGameById(id);
 }
 
@@ -214,6 +294,14 @@ export async function revealAnswer(gameId, answerId, revealedByTeam) {
     revealedByTeam
   ]);
   return rowsFromCall(resultSets)[0] || null;
+}
+
+export async function getAnswerById(answerId) {
+  const [rows] = await pool.query(
+    'SELECT id, text, points FROM sf_answers WHERE id = ? LIMIT 1',
+    [answerId]
+  );
+  return rows[0] || null;
 }
 
 export async function getRevealedAnswers(gameId) {

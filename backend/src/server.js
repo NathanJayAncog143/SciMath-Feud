@@ -4,8 +4,10 @@ import {
   addTeamStrike,
   createGame,
   createGameWithCustomNames,
+  getAnswerById,
   getAllGameSets,
   getGameById,
+  getGameEvents,
   getGameSetByCode,
   getLatestGameByGameSet,
   getQuestions,
@@ -13,6 +15,7 @@ import {
   getTeams,
   revealAnswer,
   saveGameSet,
+  tryRecordGameEvent,
   triggerGameSound,
   updateGame
 } from './db.js';
@@ -181,9 +184,24 @@ const server = createServer(async (req, res) => {
     const strikeMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/team-strikes$/);
     if (req.method === 'POST' && strikeMatch) {
       const body = await readJsonBody(req);
-      const game = await addTeamStrike(decodeURIComponent(strikeMatch[1]), Number(body.teamId));
+      const gameId = decodeURIComponent(strikeMatch[1]);
+      const teamId = Number(body.teamId);
+      const game = await addTeamStrike(gameId, teamId);
+      await tryRecordGameEvent(gameId, 'strike', { teamId });
       broadcast({ type: 'game-updated', game });
       sendJson(res, 200, { game, success: true });
+      return;
+    }
+
+    const historyMatch = url.pathname.match(/^\/api\/games\/([^/]+)\/history$/);
+    if (req.method === 'GET' && historyMatch) {
+      const gameId = decodeURIComponent(historyMatch[1]);
+      const game = await getGameById(gameId);
+      if (!game) {
+        sendJson(res, 404, { events: [], success: false, error: 'Game not found' });
+        return;
+      }
+      sendJson(res, 200, { events: await getGameEvents(gameId), success: true });
       return;
     }
 
@@ -202,14 +220,17 @@ const server = createServer(async (req, res) => {
       if (req.method === 'POST') {
         const body = await readJsonBody(req);
         const teamId = body.teamId === null ? null : Number(body.teamId);
+        let winnerRecorded = false;
 
         if (teamId === null) {
           buzzerLocks.delete(gameId);
         } else if (Number.isInteger(teamId) && teamId >= 1 && teamId <= 5 && !buzzerLocks.has(gameId)) {
           buzzerLocks.set(gameId, { teamId, lockedAt: new Date().toISOString() });
+          winnerRecorded = true;
         }
 
         const buzzer = buzzerLocks.get(gameId) || { teamId: null, lockedAt: null };
+        if (winnerRecorded) await tryRecordGameEvent(gameId, 'buzz', { teamId });
         broadcast({ type: 'buzzer-updated', gameId, buzzer });
         sendJson(res, 200, { buzzer, success: true });
         return;
@@ -239,7 +260,19 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/game-answers') {
       const body = await readJsonBody(req);
-      const revealed = await revealAnswer(body.game_id, body.answer_id, Number(body.revealed_by_team || 0));
+      const teamId = Number(body.revealed_by_team || 0);
+      const revealed = await revealAnswer(body.game_id, body.answer_id, teamId);
+      let answer = null;
+      try {
+        answer = await getAnswerById(body.answer_id);
+      } catch (error) {
+        console.error('Unable to load answer details for game history:', error);
+      }
+      await tryRecordGameEvent(body.game_id, teamId > 0 ? 'answer_scored' : 'answer_revealed', {
+        teamId: teamId > 0 ? teamId : null,
+        points: teamId > 0 ? Number(answer?.points || 0) : null,
+        details: answer?.text || null
+      });
       broadcast({ type: 'answer-revealed', revealed });
       sendJson(res, 201, { revealed, success: true });
       return;

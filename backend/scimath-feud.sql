@@ -134,6 +134,22 @@ CREATE TABLE IF NOT EXISTS `sf_game_answers` (
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `sf_game_events` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `game_id` CHAR(36) NOT NULL,
+  `event_type` VARCHAR(40) NOT NULL,
+  `team_id` TINYINT UNSIGNED NULL,
+  `points` INT NULL,
+  `details` VARCHAR(255) NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_game_events_game_created` (`game_id`, `created_at`),
+  CONSTRAINT `fk_game_events_game`
+    FOREIGN KEY (`game_id`) REFERENCES `sf_games` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DELIMITER $$
 
 CREATE PROCEDURE `sp_get_teams`()

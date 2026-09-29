@@ -302,6 +302,25 @@ export interface GameBuzzerState {
   lockedAt: string | null;
 }
 
+export type GameHistoryEventType =
+  | 'buzz'
+  | 'answer_scored'
+  | 'answer_revealed'
+  | 'strike'
+  | 'question_changed'
+  | 'status_changed';
+
+export interface GameHistoryEvent {
+  id: number;
+  game_id: string;
+  event_type: GameHistoryEventType;
+  team_id: number | null;
+  team_name: string | null;
+  points: number | null;
+  details: string | null;
+  created_at: string;
+}
+
 export interface GameSetQuestion {
   id?: string;
   question: string;
@@ -478,6 +497,13 @@ export const getGameBuzzerState = async (gameId: string): Promise<GameBuzzerStat
     console.error('Error fetching buzzer state:', error);
     return { teamId: null, lockedAt: null };
   }
+};
+
+export const getGameHistory = async (gameId: string): Promise<GameHistoryEvent[]> => {
+  const response = await request<{ events: GameHistoryEvent[] }>(
+    `/api/games/${encodeURIComponent(gameId)}/history`
+  );
+  return response.events;
 };
 
 export const revealAnswerInGame = async (gameId: string, answerId: string, revealedByTeam: number): Promise<boolean> => {

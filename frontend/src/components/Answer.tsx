@@ -53,6 +53,7 @@ interface HostControlProps {
   onPauseGame?: () => void;
   onEndGame?: () => void;
   onBackToWelcome: () => void;
+  onOpenHistory?: () => void;
   hasUndo?: boolean;
   onUndoLastScoreChange?: () => void;
   onAddCustomScore?: (teamId: number, points: number) => void;
@@ -72,7 +73,7 @@ interface HostControlProps {
   buzzerLockedTeam?: number | null;
 }
 const HostControl: React.FC<HostControlProps> = ({
-  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds, onResetBuzzer, arduinoConnected = false, onConnectBuzzer, onDisconnectBuzzer, buzzerConnecting = false, buzzerButtonStates = [], buzzerError = null, buzzerLockedTeam = null
+  currentQuestionIndex, totalQuestions, answers, team1Name = 'TEAM NAME (1)', team2Name = 'TEAM NAME (2)', team3Name = 'TEAM NAME (3)', team4Name = 'TEAM NAME (4)', team5Name = 'TEAM NAME (5)', team1Score, team2Score, team3Score, team4Score, team5Score, team1Strikes = 0, team2Strikes = 0, team3Strikes = 0, team4Strikes = 0, team5Strikes = 0, gameStatus = 'waiting', onRevealAnswer, onRevealAnswerNoPoints, onTriggerStrikeAnimation, onNextQuestion, onAddStrike, onStartGame, onPauseGame, onEndGame, onBackToWelcome, onOpenHistory, hasUndo = false, onUndoLastScoreChange, onAddCustomScore, hasStrikeUndo = false, onUndoLastStrikeChange, onTriggerIntenseSound, onTriggerWinningSound, onTriggerStopSounds, onResetBuzzer, arduinoConnected = false, onConnectBuzzer, onDisconnectBuzzer, buzzerConnecting = false, buzzerButtonStates = [], buzzerError = null, buzzerLockedTeam = null
 }) => {
   const [selectedTeam, setSelectedTeam] = useState<number>(1);
   const [lockedTeam, setLockedTeam] = useState<number | null>(null);
@@ -101,8 +102,10 @@ const HostControl: React.FC<HostControlProps> = ({
 
     const previous = previousBuzzerStatesRef.current;
     if (lockedTeamRef.current === null) {
+      const teamStrikes = [team1Strikes, team2Strikes, team3Strikes, team4Strikes, team5Strikes];
       for (let index = 0; index < buzzerButtonStates.length && index < 5; index += 1) {
         if (!previous[index] && buzzerButtonStates[index]) {
+          if (teamStrikes[index] >= 3) continue;
           const teamId = index + 1;
           lockedTeamRef.current = teamId;
           setLockedTeam(teamId);
@@ -112,7 +115,7 @@ const HostControl: React.FC<HostControlProps> = ({
       }
     }
     previousBuzzerStatesRef.current = [...buzzerButtonStates];
-  }, [arduinoConnected, buzzerButtonStates]);
+  }, [arduinoConnected, buzzerButtonStates, team1Strikes, team2Strikes, team3Strikes, team4Strikes, team5Strikes]);
 
   // A new question starts a fresh buzzer round.
   useEffect(() => {
@@ -464,6 +467,21 @@ const HostControl: React.FC<HostControlProps> = ({
 
         {/* Unified team, strike, question, and answer controls */}
         <div className="bg-black/30 backdrop-blur-md rounded-xl mb-8 border border-white/20 overflow-hidden shadow-2xl">
+        {onOpenHistory && (
+          <section className="px-5 py-3 border-b border-white/20 bg-indigo-950/40 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-white text-sm font-bold">Game History</div>
+              <div className="text-indigo-200 text-xs truncate">Buzzes, scores, strikes, and times</div>
+            </div>
+            <button
+              onClick={onOpenHistory}
+              className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+              title="Open this game's activity history"
+            >
+              View History
+            </button>
+          </section>
+        )}
         <section className="p-6">
           <div className="text-white text-xl font-bold mb-4 text-center">Select Team to Award Points</div>
           {lockedTeam !== null && (

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import HostControl from './Answer';
+import GameHistory from './GameHistory';
 import { getGameSetByCode, createGameWithCustomNames, updateGameScore, revealAnswerInGame, updateGameStatus, addTeamStrike, triggerGameSound, getGameBuzzerState, setGameBuzzerWinner, getRevealedAnswerDetails, supabase } from '../lib/supabase';
 import type { GameState, Game, GameSet } from '../lib/supabase';
 import { useArduino } from '../hooks/useArduino';
@@ -12,6 +13,8 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
   const [gameCode, setGameCode] = useState('');
   const [gameSet, setGameSet] = useState<GameSet | null>(null);
   const [game, setGame] = useState<Game | null>(null);
+  const [resumableGame, setResumableGame] = useState<Game | null>(null);
+  const [showNewGameForm, setShowNewGameForm] = useState(false);
   const [gameState, setGameState] = useState<GameState>({
     currentQuestionIndex: 0,
     team1Score: 0,
@@ -36,6 +39,7 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
   const [customTeam5Name, setCustomTeam5Name] = useState('');
   // Step state
   const [step, setStep] = useState<'code' | 'teams' | 'control'>('code');
+  const [showHistory, setShowHistory] = useState(false);
   // Undo functionality states
   const [previousGameState, setPreviousGameState] = useState<GameState | null>(null);
   const [hasUndo, setHasUndo] = useState(false);
@@ -99,17 +103,36 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
 
     const previous = previousArduinoButtonsRef.current;
     if (buzzerLockedTeam === null && game?.id) {
+      const teamStrikes = [
+        game.team1_strikes || 0,
+        game.team2_strikes || 0,
+        game.team3_strikes || 0,
+        game.team4_strikes || 0,
+        game.team5_strikes || 0,
+      ];
       for (let index = 0; index < arduinoButtonStates.length && index < 5; index += 1) {
         if (!previous[index] && arduinoButtonStates[index]) {
+          if (teamStrikes[index] >= 3) continue;
           const teamId = index + 1;
-          setBuzzerLockedTeam(teamId);
-          void setGameBuzzerWinner(game.id, teamId);
+          void setGameBuzzerWinner(game.id, teamId).then(buzzer => {
+            if (buzzer) setBuzzerLockedTeam(buzzer.teamId);
+          });
           break;
         }
       }
     }
     previousArduinoButtonsRef.current = [...arduinoButtonStates];
-  }, [arduinoButtonStates, arduinoConnected, buzzerLockedTeam, game?.id]);
+  }, [
+    arduinoButtonStates,
+    arduinoConnected,
+    buzzerLockedTeam,
+    game?.id,
+    game?.team1_strikes,
+    game?.team2_strikes,
+    game?.team3_strikes,
+    game?.team4_strikes,
+    game?.team5_strikes,
+  ]);
 
   const handleResetBuzzer = async () => {
     resetArduinoBuzzer();
@@ -312,6 +335,9 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
     }
     setLoading(true);
     setError(null);
+    setGameSet(null);
+    setResumableGame(null);
+    setShowNewGameForm(false);
     try {
       const { gameSet: gameSetData, success, error: gameSetError } = await getGameSetByCode(gameCode.trim());
       if (!success || !gameSetData) {
@@ -320,11 +346,89 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
         return;
       }
       setGameSet(gameSetData);
+
+      const { data: latestGame, error: latestGameError } = await supabase
+        .from('games')
+        .select('*')
+        .eq('game_set_id', gameSetData.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestGameError && !latestGameError.message.includes('(404)')) {
+        setError('The game set was found, but existing games could not be checked. Please try again.');
+        return;
+      }
+
+      const ongoingGame = !latestGameError && latestGame
+        && (latestGame.game_status === 'playing' || latestGame.game_status === 'paused')
+        ? latestGame as Game
+        : null;
+      setResumableGame(ongoingGame);
+      setShowNewGameForm(!ongoingGame);
       setError(null);
       setStep('teams');
-    } catch (error) {
+    } catch {
       setError('Failed to validate game code');
       setGameSet(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resumeHostGame = async () => {
+    if (!resumableGame || !gameSet) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      // Refresh before resuming so Host Control restores the newest persisted
+      // state, even if it changed while this choice was on screen.
+      const { data: currentGame, error: gameError } = await supabase
+        .from('games')
+        .select('*')
+        .eq('id', resumableGame.id)
+        .single();
+
+      if (gameError || !currentGame) {
+        setError('The ongoing game could not be loaded. Please validate the code again.');
+        return;
+      }
+      if (currentGame.game_status !== 'playing' && currentGame.game_status !== 'paused') {
+        setResumableGame(null);
+        setShowNewGameForm(true);
+        setError('That game has already ended. You can start a new game below.');
+        return;
+      }
+
+      const maximumQuestionIndex = Math.max((gameSet.questions?.length || 1) - 1, 0);
+      const questionIndex = Math.min(Math.max(currentGame.current_question_index || 0, 0), maximumQuestionIndex);
+
+      setCustomTeam1Name(currentGame.team1_custom_name || currentGame.team1?.name || '');
+      setCustomTeam2Name(currentGame.team2_custom_name || currentGame.team2?.name || '');
+      setCustomTeam3Name(currentGame.team3_custom_name || currentGame.team3?.name || '');
+      setCustomTeam4Name(currentGame.team4_custom_name || currentGame.team4?.name || '');
+      setCustomTeam5Name(currentGame.team5_custom_name || currentGame.team5?.name || '');
+      setGameState({
+        currentQuestionIndex: questionIndex,
+        team1Score: currentGame.team1_score || 0,
+        team2Score: currentGame.team2_score || 0,
+        team3Score: currentGame.team3_score || 0,
+        team4Score: currentGame.team4_score || 0,
+        team5Score: currentGame.team5_score || 0,
+        strikes: currentGame.strikes || 0,
+        gameStarted: currentGame.game_status === 'playing',
+      });
+      setGameStatus(currentGame.game_status);
+      setGame(currentGame);
+      setHasUndo(false);
+      setPreviousGameState(null);
+      setHasStrikeUndo(false);
+      setPreviousStrikes(null);
+      setStep('control');
+    } catch (error) {
+      console.error('Failed to resume game:', error);
+      setError('Failed to resume the ongoing game. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -369,12 +473,27 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
         setError(gameError || 'Failed to create game');
         return;
       }
-      await updateGameStatus(gameData.id, 'playing');
+      const started = await updateGameStatus(gameData.id, 'playing');
+      if (!started) {
+        setError('The game was created but could not be started. Please validate the code again.');
+        return;
+      }
       setGameStatus('playing');
-      setGame(gameData);
+      setGame({ ...gameData, game_status: 'playing' });
+      setGameState({
+        currentQuestionIndex: 0,
+        team1Score: 0,
+        team2Score: 0,
+        team3Score: 0,
+        team4Score: 0,
+        team5Score: 0,
+        strikes: 0,
+        gameStarted: true,
+      });
+      setResumableGame(null);
       setStep('control');
       setError(null);
-    } catch (error) {
+    } catch {
       setError('Failed to start game');
     } finally {
       setLoading(false);
@@ -682,7 +801,13 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
                 <input
                   type="text"
                   value={gameCode}
-                  onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setGameCode(e.target.value.toUpperCase());
+                    setGameSet(null);
+                    setResumableGame(null);
+                    setShowNewGameForm(false);
+                    setError(null);
+                  }}
                   placeholder="Enter game code (e.g., DEMO001)"
                   className="flex-1 px-4 py-3 text-lg font-mono border-2 border-purple-400 rounded-xl focus:border-pink-400 focus:outline-none bg-[#1f225d] text-white"
                   maxLength={20}
@@ -736,12 +861,51 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
   }
   if (step === 'teams') {
     return (
-      <div className="w-screen h-screen fixed inset-0 overflow-hidden bg-[#1f225d] flex items-center justify-center">
+      <div className="w-screen h-screen fixed inset-0 overflow-y-auto bg-[#1f225d] flex items-start md:items-center justify-center py-6">
         <div className="max-w-md w-full mx-4">
           <div className="bg-[#2a2e6b] rounded-xl shadow-2xl p-8 border border-purple-400/30">
-            <h1 className="text-3xl font-black text-center mb-8 text-white">Enter Team Names</h1>
+            <h1 className="text-3xl font-black text-center mb-6 text-white">
+              {resumableGame ? 'Ongoing Game Found' : 'Enter Team Names'}
+            </h1>
+            {resumableGame && (
+              <div className="mb-6 p-4 bg-amber-500/15 border border-amber-300/50 rounded-xl">
+                <p className="text-amber-200 font-bold mb-1">
+                  {resumableGame.game_status === 'paused' ? 'Paused' : 'Playing'} game available
+                </p>
+                <p className="text-sm text-amber-100 mb-4">
+                  Question {resumableGame.current_question_index + 1} · Created {resumableGame.created_at ? new Date(resumableGame.created_at).toLocaleString() : 'earlier'}
+                </p>
+                <p className="text-xs text-amber-100/80 mb-4">
+                  Teams: {[resumableGame.team1_custom_name, resumableGame.team2_custom_name, resumableGame.team3_custom_name, resumableGame.team4_custom_name, resumableGame.team5_custom_name].filter(Boolean).join(', ')}
+                </p>
+                <button
+                  onClick={resumeHostGame}
+                  disabled={loading}
+                  className="w-full px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-gray-500 text-gray-950 font-black rounded-xl transition-all duration-200"
+                >
+                  {loading ? 'Loading Game...' : 'Resume Ongoing Game'}
+                </button>
+                {!showNewGameForm && (
+                  <button
+                    onClick={() => {
+                      setShowNewGameForm(true);
+                      setError(null);
+                    }}
+                    disabled={loading}
+                    className="w-full mt-3 px-4 py-2 bg-transparent hover:bg-white/10 text-amber-100 font-bold rounded-xl border border-amber-200/40 transition-all duration-200"
+                  >
+                    Start a New Game Instead
+                  </button>
+                )}
+              </div>
+            )}
+            {showNewGameForm && resumableGame && (
+              <p className="mb-4 text-center text-sm text-orange-200">
+                Starting a new game creates a separate session. Audience screens must rejoin to use it.
+              </p>
+            )}
             {/* Team Name Inputs */}
-            <div className="space-y-4 mb-6">
+            {showNewGameForm && <div className="space-y-4 mb-6">
               <div className="grid grid-cols-1 gap-4">
                 <input type="text" value={customTeam1Name} onChange={e => setCustomTeam1Name(e.target.value)} placeholder="Team 1 Name" className="w-full px-4 py-3 text-lg border-2 border-purple-400 rounded-xl focus:border-pink-400 focus:outline-none bg-[#1f225d] text-white" />
                 <input type="text" value={customTeam2Name} onChange={e => setCustomTeam2Name(e.target.value)} placeholder="Team 2 Name" className="w-full px-4 py-3 text-lg border-2 border-purple-400 rounded-xl focus:border-pink-400 focus:outline-none bg-[#1f225d] text-white" />
@@ -749,7 +913,7 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
                 <input type="text" value={customTeam4Name} onChange={e => setCustomTeam4Name(e.target.value)} placeholder="Team 4 Name" className="w-full px-4 py-3 text-lg border-2 border-purple-400 rounded-xl focus:border-pink-400 focus:outline-none bg-[#1f225d] text-white" />
                 <input type="text" value={customTeam5Name} onChange={e => setCustomTeam5Name(e.target.value)} placeholder="Team 5 Name" className="w-full px-4 py-3 text-lg border-2 border-purple-400 rounded-xl focus:border-pink-400 focus:outline-none bg-[#1f225d] text-white" />
               </div>
-            </div>
+            </div>}
             {/* Error Message */}
             {error && (
               <div className="mb-6 p-4 bg-red-600/20 border border-red-400/50 rounded-xl">
@@ -759,22 +923,44 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
             {/* Action Buttons */}
             <div className="flex space-x-4">
               <button
-                onClick={() => setStep('code')}
+                onClick={() => {
+                  setStep('code');
+                  setError(null);
+                }}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-xl transition-all duration-200"
               >
                 ← Back
               </button>
-              <button
-                onClick={startHostGame}
-                disabled={loading}
-                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold rounded-xl transition-all duration-200"
-              >
-                {loading ? 'Starting...' : 'Start Game'}
-              </button>
+              {showNewGameForm && (
+                <button
+                  onClick={startHostGame}
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold rounded-xl transition-all duration-200"
+                >
+                  {loading ? 'Starting...' : resumableGame ? 'Start New Game' : 'Start Game'}
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (showHistory && game) {
+    return (
+      <GameHistory
+        game={{
+          ...game,
+          team1_score: gameState.team1Score,
+          team2_score: gameState.team2Score,
+          team3_score: gameState.team3Score,
+          team4_score: gameState.team4Score,
+          team5_score: gameState.team5Score,
+        }}
+        gameCode={gameCode}
+        onBack={() => setShowHistory(false)}
+      />
     );
   }
 
@@ -830,6 +1016,7 @@ const HostControlScreen: React.FC<HostControlScreenProps> = ({ onBackToWelcome }
       onPauseGame={pauseGame}
       onEndGame={endGame}
       onBackToWelcome={onBackToWelcome}
+      onOpenHistory={() => setShowHistory(true)}
       onTriggerStrikeAnimation={triggerStrikeAnimation}
       hasUndo={hasUndo}
       onUndoLastScoreChange={undoLastScoreChange}
